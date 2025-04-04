@@ -455,7 +455,7 @@ process_unknown_names <- function(dataset, batch_size = 100) {
     cat(sprintf("Processing batch %d of %d (%d names)\n", i, num_batches, length(current_batch)))
     
     # Set API key
-    Sys.setenv(OPENAI_API_KEY = "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")  # Replace with your OpenAI API key
+    Sys.setenv("chat_key")  # Replace with your OpenAI API key
     
     # Create chat object
     chat <- ellmer::chat_openai(
