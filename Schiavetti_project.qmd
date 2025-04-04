@@ -1,0 +1,1896 @@
+---
+title: "Understanding Gender Differences in Online Comments about Femicides in Italy"
+author: Claudia Schiavetti
+email: claudia.schiavetti@campus.lmu.de
+format: 
+  pdf:
+    css: styles.css
+editor: visual
+geometry: "left=2.5cm, right=2.5cm , top=2.5cm, bottom=2.5cm"
+mainfont: "Times New Roman"
+fontsize: 12pt
+date: 'last-modified'
+date-format: 'MMMM D, YYYY'
+abstract: 'This study explores gender differences in public reactions to femicides in Italy by analyzing YouTube comments from major Italian news channels (RAI, La7, and Nove) using data collected via the YouTube API.The research investigates the emotional tone and discourse structures of male and female users in response to high-profile femicide cases. Gender is inferred through a hybrid approach using name-matching and large language models (LLMs). The study also considers activity levels (most vs. less active users) and the role of emoji in sentiment classification. Results indicate distinct gender-based patterns, with female users showing more empathetic and relational language and male users focusing more on justice-oriented and negative expressions. Findings highlight the importance of lexicon choice and textual context (e.g., negation and emoji use) in shaping sentiment analysis outcomes.'
+execute:
+  echo: false
+  warning: false
+  message: false
+  cache: false
+knitr: 
+  opts_chunk: 
+    screenshot.force: TRUE
+---
+
+\newpage
+
+## Introduction and Motivation
+
+Femicide, the killing of women and girls because of their gender, is a serious global issue and the most extreme form of violence against women. It is rooted in misogyny, harmful beliefs, and social norms that fuel gender inequality. The scale of this problem has drawn growing attention from both the public and researchers, especially regarding how it plays out in online spaces. Social media platforms, like YouTube, offer a valuable place to observe public reactions to important social issues such as femicide.
+
+In Italy, public debate around femicide has intensified, especially after several high-profile cases. Among these, the murders of Giulia Cecchettin and Giulia Tramontano sparked national attention and outrage. Giulia Cecchettin, a 22-year-old university student, was murdered by her ex-boyfriend Filippo Turetta in November 2023. Her disappearance and the discovery of her body, with more than twenty stab wounds, triggered nationwide protests and renewed focus on domestic violence. The severity of the crime, coupled with the young age of those involved, further fueled public anger. The case ended with Turetta receiving a life sentence, turning the event into a symbol of the broader problem of femicide in Italy.
+
+Similarly, Giulia Tramontano, a 29-year-old woman who was seven months pregnant, was killed by her boyfriend Alessandro Impagnatiello in May 2023 near Milan. She suffered 37 stab wounds, two of which were fatal. The fact that she was pregnant added emotional weight to the case and shaped public sentiment. Impagnatiello confessed, and the case remains under public scrutiny, fueling further discussion on violence against women.
+
+This study examines public sentiment on these cases by analyzing comments posted under related videos on the YouTube channels of RAI, La7, and Nove. RAI is Italy’s national public broadcaster, offering a wide range of news and general content. La7 is a commercial broadcaster known for news and political talk shows, attracting a politically engaged audience. Nove, part of Warner Bros. Discovery, is a general entertainment channel with a diverse viewership. These three platforms provide varied perspectives on how different audiences engage with femicide cases online.
+
+The dataset consists of YouTube comments on videos about the femicides of Giulia Cecchettin and Giulia Tramontano from these media outlets. These comments are used to explore public sentiment, with a focus on identifying differences based on the gender of the commenters. Gender is inferred from usernames using a large language model (LLM) and name-matching techniques. The goal is to examine whether female and male commenters express sentiment differently when reacting to news about femicide.
+
+This leads to the key research question: Is there a significant difference in sentiment between female and male commenters on YouTube videos about the Giulia Cecchettin and Giulia Tramontano femicide cases published by RAI, La7, and Nove?
+
+This question is important for several reasons. While previous research has explored gender differences in online communication and sentiment analysis, little work has focused specifically on how gender shapes reactions to femicide in Italy on social media. Studies suggest women might express emotions more strongly and use more civil language online, while men might engage more frequently in less filtered or negative commentary. However, how these general patterns apply to sensitive topics like femicide requires dedicated investigation.
+
+Additionally, this research makes a methodological contribution by using a large dataset of user-generated comments to study public reactions to social issues. The comment sections of news videos give a direct and often raw look at public opinion, making them valuable for social research. By combining Natural Language Processing (NLP), sentiment analysis, and gender classification using an LLM, this study offers a new approach to understanding gendered patterns in online discussions.
+
+Finally, this work aims to deepen understanding of how men and women engage with sensitive issues like femicide in Italy. Identifying differences in sentiment can provide insights into varying levels of empathy, awareness, or perspectives on violence against women. The findings could help shape future research on gender and media, as well as improve public awareness campaigns aimed at addressing femicide.
+
+This study is motivated by the persistent issue of femicide in Italy, where legal measures have not stopped the alarming number of women killed by partners or ex-partners. Data from the Italian Ministry of the Interior show that one femicide happens almost every three days, raising questions about why this violence continues and how society responds.
+
+Public protests and feminist movements have been key in pushing the issue of "femminicidio" into national discussions, framing it as a problem rooted in patriarchal systems and gender inequality. Media coverage and social mobilization following the cases of Cecchettin and Tramontano reflect how much this issue resonates with the public.
+
+In today’s world, platforms like YouTube are central to public debate. Comments on news videos show how people react to major events, often without filters. Analyzing these comments helps reveal public sentiment and offers insights into how people process emotionally charged topics like femicide.
+
+This study focuses on possible differences in how men and women react online to violence against women. Past research shows that gender may influence online communication styles and emotional expression. For example, women may show more emotional responses and civility in online discussions, while men may display more aggressive or dismissive behaviors. Understanding these patterns in the context of femicide could shed light on deeper social attitudes and biases.
+
+This research contributes to several areas: Social media analysis, using YouTube comments to study public sentiment around violence against women. Gender studies, exploring gendered patterns in online reactions to femicide. Media studies, comparing responses across different types of media outlets.
+
+Ultimately, this project aims to provide a clearer picture of how gender shapes online reactions to femicide in Italy, contributing to a broader understanding of this urgent social issue.
+
+## Methodology
+
+### Data Collection
+
+```{r}
+#First load the required packages
+library(stringr)
+library(dplyr)
+library(tidyr)
+library(stringi)
+library(tm)
+library(openxlsx)
+library(ggplot2)
+library(SnowballC)
+library(wordcloud2)
+library(tidytext)
+library(caret)
+library(syuzhet)
+library(xml2)
+library(patchwork)
+library(igraph)
+library(ggraph)
+library(ellmer)
+library(httr)
+library(jsonlite)
+library(tuber)
+library(readxl)
+library(data.table)
+library(wordcloud)
+library(webshot)
+library(htmlwidgets)
+library(patchwork)
+
+```
+
+```{r , eval=FALSE}
+#Use the YouTubeAPI credientials to access data directly from YouTube
+client_ID = Sys.getenv("client_ID")
+client_key = Sys.getenv("client_key")
+yt_oauth(app_id = client_ID, app_secret = client_key, token = "")
+
+#First, collect data related to the "Giulia Cecchettin" case by using her name as the search keyword 
+keyword <- "Giulia Cecchettin"
+#The data is collected from three different italian tv channels. 
+#Start with the Rai channel 
+channel_id_rai <- "UCKUzdt2sELyxd6mz-bAx3bA" 
+
+#The time frame of the analysis is six months after the death of the victim
+published_after <- "2023-11-11T00:00:00Z"  
+published_before <- "2024-05-11T00:00:00Z"
+
+#Get all the videos from that specific channel and that include that specific keyword
+videos_rai <- yt_search(term = keyword, channel_id = channel_id_rai)
+
+#Filter the videos in the chosen time frame
+filtered_videos_rai <- videos_rai %>%
+  filter(publishedAt >= published_after & publishedAt <= published_before) %>%
+  select(video_id, title, publishedAt)
+
+#Function to safely get comment count
+get_comment_count <- function(video_id) {
+  tryCatch({
+    comments <- get_all_comments(video_id)
+    if (!is.null(comments) && nrow(comments) > 0) {
+      return(nrow(comments))
+    } else {
+      return(0)
+    }
+  }, error = function(e) {
+    return(0)  # Return 0 if there's an error (like no comments)
+  })
+}
+
+#Filter videos with at least 1 comment
+filtered_videos_with_comments_rai <- filtered_videos_rai %>%
+  rowwise() %>%
+  filter(get_comment_count(video_id) > 0)
+
+#Extract comments only for videos with comments
+all_comments_rai <- do.call(rbind, lapply(filtered_videos_with_comments_rai$video_id, get_all_comments))
+
+#Keep only first-level comments (direct feedback to the video) by excluding replies. 
+#This is done using the 'parentID' column: if 'parentID' is NA, it's a first-level comment; 
+#otherwise, it contains the ID of the comment it replies to.
+
+filtered_comments_rai <- all_comments_rai %>%
+  filter(is.na(parentId))
+
+write.xlsx(filtered_comments_rai, file= "comments_rai.xlsx")
+
+#Repeat the procedure for La7, which operates multiple YouTube channels.
+channel_id_la7<- "UCYj2t05uU65UrlI1f0OGhlg" 
+
+videos_la7 <- yt_search(term = keyword, channel_id = channel_id_la7)
+filtered_videos_la7 <- videos_la7 %>%
+  filter(publishedAt >= published_after & publishedAt <= published_before) %>%
+  select(video_id, title, publishedAt)
+filtered_videos_with_comments_la7 <- filtered_videos_la7 %>%
+  rowwise() %>%
+  filter(get_comment_count(video_id) > 0)
+all_comments_la7 <- do.call(rbind, lapply(filtered_videos_with_comments_la7$video_id, get_all_comments))
+filtered_comments_la7 <- all_comments_la7 %>%
+  filter(is.na(parentId))
+
+write.xlsx(filtered_comments_la7, file= "comments_la7.xlsx" )
+
+#In this section, overwrite "channel_id_la7" and "videos_la7" as the previous data is no longer needed. 
+#The new results are saved in separate, appropriately named Excel files.
+
+#Tg La7
+channel_id_la7 <- "UCxrPzaf2B_l6NvnmIRp5EKg"
+
+videos_la7 <- yt_search(term = keyword, channel_id = channel_id_la7)
+filtered_videos_la7 <- videos_la7 %>%
+  filter(publishedAt >= published_after & publishedAt <= published_before) %>%
+  select(video_id, title, publishedAt)
+filtered_videos_with_comments_la7 <- filtered_videos_la7 %>%
+  rowwise() %>%
+  filter(get_comment_count(video_id) > 0)
+all_comments_la7 <- do.call(rbind, lapply(filtered_videos_with_comments_la7$video_id, get_all_comments))
+filtered_comments_la7 <- all_comments_la7 %>%
+  filter(is.na(parentId))
+
+write.xlsx(filtered_comments_la7, file = "comments_tgla7.xlsx")
+
+#La7 Intrattenimento
+channel_id_la7 <- "UCYj2t05uU65UrlI1f0OGhlg"
+
+videos_la7 <- yt_search(term = keyword, channel_id = channel_id_la7)
+filtered_videos_la7 <- videos_la7 %>%
+  filter(publishedAt >= published_after & publishedAt <= published_before) %>%
+  select(video_id, title, publishedAt)
+filtered_videos_with_comments_la7 <- filtered_videos_la7 %>%
+  rowwise() %>%
+  filter(get_comment_count(video_id) > 0)
+all_comments_la7 <- do.call(rbind, lapply(filtered_videos_with_comments_la7$video_id, get_all_comments))
+filtered_comments_la7 <- all_comments_la7 %>%
+  filter(is.na(parentId))
+
+write.xlsx(filtered_comments_la7, file = "comments_la7_int.xlsx")
+
+
+# Finally, scrape data from channel Nove 
+
+channel_id_nove <- "UCUbQUzFjyDtRw-311tyvyzw"
+
+videos_nove <- yt_search(term = keyword, channel_id = channel_id_nove)
+filtered_videos_nove <- videos_nove %>%
+  filter(publishedAt >= published_after & publishedAt <= published_before) %>%
+  select(video_id, title, publishedAt)
+filtered_videos_with_comments_nove <- filtered_videos_nove %>%
+  rowwise() %>%
+  filter(get_comment_count(video_id) > 0)
+all_comments_nove <- do.call(rbind, lapply(filtered_videos_with_comments_nove$video_id, get_all_comments))
+filtered_comments_nove <- all_comments_nove %>%
+  filter(is.na(parentId))
+
+write.xlsx(filtered_comments_nove, file = "comments_nove.xlsx")
+
+#Now repeat the procedure for the "Giulia Tramontano" case using her name as a search keyword
+keyword <- "Giulia Tramontano"
+
+#Adjust the time frame accordingly
+published_after <- "2023-05-27T00:00:00Z"
+published_before <- "2024-11-27T00:00:00Z"
+
+#Rai channel 
+channel_id_rai <- "UCKUzdt2sELyxd6mz-bAx3bA"
+
+videos_rai <- yt_search(term = keyword, channel_id = channel_id_rai)
+filtered_videos_rai <- videos_rai %>%
+  filter(publishedAt >= published_after & publishedAt <= published_before) %>%
+  select(video_id, title, publishedAt)
+filtered_videos_with_comments_rai <- filtered_videos_rai %>%
+  rowwise() %>%
+  filter(get_comment_count(video_id) > 0)
+all_comments_rai <- do.call(rbind, lapply(filtered_videos_with_comments_rai$video_id, get_all_comments))
+filtered_comments_rai <- all_comments_rai %>%
+  filter(is.na(parentId))
+
+write.xlsx(filtered_comments_rai, file = "comments_rai_1.xlsx")
+
+#La7
+channel_id_la7 <- "UCYj2t05uU65UrlI1f0OGhlg"
+
+videos_la7 <- yt_search(term = keyword, channel_id = channel_id_la7)
+filtered_videos_la7 <- videos_la7 %>%
+  filter(publishedAt >= published_after & publishedAt <= published_before) %>%
+  select(video_id, title, publishedAt)
+filtered_videos_with_comments_la7 <- filtered_videos_la7 %>%
+  rowwise() %>%
+  filter(get_comment_count(video_id) > 0)
+all_comments_la7 <- do.call(rbind, lapply(filtered_videos_with_comments_la7$video_id, get_all_comments))
+filtered_comments_la7 <- all_comments_la7 %>%
+  filter(is.na(parentId))
+
+write.xlsx(filtered_comments_la7, file = "comments_la7_1.xlsx")
+
+#La7 Attualità
+channel_id_la7 <- "UCvASwurO-KQMoLVHWKdwT_w"
+
+videos_la7 <- yt_search(term = keyword, channel_id = channel_id_la7)
+filtered_videos_la7 <- videos_la7 %>%
+  filter(publishedAt >= published_after & publishedAt <= published_before) %>%
+  select(video_id, title, publishedAt)
+filtered_videos_with_comments_la7 <- filtered_videos_la7 %>%
+  rowwise() %>%
+  filter(get_comment_count(video_id) > 0)
+all_comments_la7 <- do.call(rbind, lapply(filtered_videos_with_comments_la7$video_id, get_all_comments))
+filtered_comments_la7 <- all_comments_la7 %>%
+  filter(is.na(parentId))
+
+write.xlsx(filtered_comments_la7, file = "comments_la7_att_1.xlsx")
+
+#La7 Inrattenimento
+
+channel_id_la7 <- "UCYj2t05uU65UrlI1f0OGhlg"
+
+videos_la7 <- yt_search(term = keyword, channel_id = channel_id_la7)
+filtered_videos_la7 <- videos_la7 %>%
+  filter(publishedAt >= published_after & publishedAt <= published_before) %>%
+  select(video_id, title, publishedAt)
+filtered_videos_with_comments_la7 <- filtered_videos_la7 %>%
+  rowwise() %>%
+  filter(get_comment_count(video_id) > 0)
+all_comments_la7 <- do.call(rbind, lapply(filtered_videos_with_comments_la7$video_id, get_all_comments))
+filtered_comments_la7 <- all_comments_la7 %>%
+  filter(is.na(parentId))
+
+write.xlsx(filtered_comments_la7, file = "comments_la7_int_1.xlsx")
+
+# Some channels may not have videos with comments matching the keyword in the selected time frame.
+# This is expected and does not bias the analysis, as both cases are treated together as femicide cases within the same category, not as separate events.
+# I included the code only for those channels that had both videos and comments matching the specified criteria.
+```
+
+The target population of this study comprises YouTube commenters who react to and engage in discussions about femicides in response to videos covering these cases, posted by the official channels of major Italian television networks. The dataset includes user-generated comments on YouTube videos related to two highly famous femicide cases in Italy in 2023: the murders of Giulia Cecchettin and Giulia Tramontano. Comments were collected from the official YouTube channels of three leading Italian broadcasters: RAI, La7 (including sub-channels such as TgLa7 and La7 Intrattenimento), and Nove.
+
+Data collection was performed using the YouTube API through the *tuber* R package. The selected videos include all content published on the official channels within six months following the victims' deaths. The search strategy was based on the victims' full names as keywords, followed by filtering the results according to the defined time windows. Specifically, for Giulia Cecchettin, the observation period spans from November 11, 2023, to May 11, 2024, while for Giulia Tramontano, the window ranges from May 27, 2023, to November 27, 2023.
+
+To ensure dataset consistency and focus, only first-level comments, those posted directly in response to the videos, are retained, while replies to other comments are excluded. This filtering is based on the *parentID* variable, where first-level comments are marked by an NA value, while second-level comments display the ID of the parent comment. Additionally, only videos with at least one comment are included.
+
+It is important to note that not all channels published videos that meet both the keyword and time frame criteria. However, this does not affect the analysis, as the two cases are treated collectively under the broader category of femicides, rather than as isolated incidents.
+
+```{r}
+## Load all datasets and merge them into a single dataset, retaining the file name for identification.
+ 
+file_list <- list.files( full.names = TRUE, pattern = "^comments.*\\.xlsx$")
+
+final_dataset <- lapply(file_list, function(file) {
+  read_excel(file) %>%
+    mutate(source_file = basename(file))  # Add column with file name
+}) %>%
+  bind_rows()
+
+# Clean the dataset by removing duplicate videos and any missing values in the 'textOriginal' (comment) column.
+
+final_dataset <- final_dataset[!duplicated(final_dataset$textOriginal),] %>% 
+  drop_na(textOriginal)
+write.xlsx(final_dataset, file= "final_dataset.xlsx" )
+
+```
+
+The comments were fist saved into different datasets and then were merged into a final dataset, resulting in a comprehensive collection of public reactions to the femicides.
+
+The final dataset contains 40224 observations and 17 variables. The most relevant variables from the resulting dataset are:
+
+-   **ChannelID** and **source_file**: Both variables capture the origin of the data by identifying the official YouTube channel from which each comment is retrieved. While *ChannelID* records the native alphanumeric identifier assigned by the YouTube platform, *source_file* is generated to facilitate interpretability by mapping each *ChannelID* to a recognizable label corresponding to the broadcaster’s channel. Specifically, *source_file* is a factor variable categorizing each observation by the respective channel name. This variable is created during the data integration process by appending an identifier to each set of comments when the datasets, originally collected separately by channel, are combined into a single unified dataset. This step facilitates subsequent data handling and improves clarity during the analytical process.
+-   **textOriginal**: This is a text variable that stores the full content of each user comment.
+-   **authorDisplayName**: This is a text variable containing the username of each commenter. It is later used in the gender assignment procedure described in the following section.
+-   **likeCount**: This is a numeric variable that records the number of likes received by each comment.
+-   **parentId**: As previously mentioned, this variable has two possible outcomes: an NA value, indicating that the comment is a first-level comment (posted directly under the video), or the ID of the parent comment if it is a reply (second-level comment). This variable is used to filter and retain only first-level comments for the analysis.
+
+```{r}
+# Assign gender in three steps:
+# Step 1: Extract potential names from the 'authorDisplayName' column (usernames) by matching them 
+#         to a dataset of common Italian names.
+# Step 2: Assign gender based on the matched name.
+# Step 3: Use a large language model (ChatGPT) to predict gender for names not matched in the previous step.
+# The 'gender' variable will have three possible values: "female", "male", or "unknown" 
+# if gender cannot be assigned from the username.
+
+#The code is first applied to a subset of 100 observations from the final dataset to test and evaluate performance.
+set.seed(123)
+prova <- final_dataset %>% sample_n(100)
+
+#Load the dataset with the most common italian names
+italian_names <- read.csv("italian_names_dataset.csv") 
+#dataset with most common italian names 
+#Fix column names
+setnames(italian_names, c("name", "gender"))
+#Fix gender values (convert to lowercase)
+italian_names$gender <- tolower(italian_names$gender)
+#Add name length as a column and then sort
+italian_names$name_length <- nchar(italian_names$name)
+#Convert names to lowercase
+italian_names$name <- tolower(italian_names$name)
+#Sort by length
+setorder(italian_names, -name_length)
+
+#Function to extract potential first names from usernames
+find_italian_name_in_string <- function(username) {
+  if (is.na(username) || nchar(username) == 0) return(list(found_name = "", gender = "unknown"))
+  
+  # Clean the username
+  clean_username <- username %>%
+    str_replace_all("[^a-zA-Z]", "") %>%  # Remove non-alphabetic characters
+    str_to_lower()                        # Convert to lowercase
+  
+  # Try to find any Italian name within the username
+  for (i in 1:nrow(italian_names)) {
+    current_name <- italian_names$name[i]
+    if (grepl(current_name, clean_username)) {
+      return(list(
+        found_name = current_name, 
+        gender = italian_names$gender[i]
+      ))
+    }
+  }
+  
+  # If no match found
+  return(list(found_name = "", gender = "unknown"))
+}
+
+#Apply name detection to dataset
+apply_advanced_gender_detection <- function(dataset, username_column) {
+  # Create a copy to avoid modifying the original
+  result_dataset <- dataset
+  
+  # Apply the name finding function to each username
+  results <- lapply(dataset[[username_column]], find_italian_name_in_string)
+  
+  # Extract results
+  result_dataset$found_name <- sapply(results, function(x) x$found_name)
+  result_dataset$predicted_gender <- sapply(results, function(x) x$gender)
+  
+  return(result_dataset)
+}
+
+#Apply to the test dataset
+prova <- apply_advanced_gender_detection(prova, "authorDisplayName")
+```
+
+### Gender Assignment
+
+A key methodological challenge in this study is the gender assignment of YouTube commenters, as the YouTube API does not provide gender information due to privacy restrictions. However, gender attribution is essential for the scope of this research. To address this, a gender assignment procedure is implemented using a combination of traditional name-matching techniques and a Large Language Model (LLM). The procedure is structured into three main steps:
+
+Firstly, a dataset of common Italian first names and their associated genders is created. This list functions as a reference for identifying potential names embedded within usernames. Usernames are systematically scanned to extract any substring that corresponds to a name listed in the reference dataset. For example, in the username "Marco_1960", the string "Marco" would be extracted and linked to the male gender based on the name list.
+
+Secondly, when a match is identified between a username and the reference dataset, the corresponding gender is directly assigned to the commenter.This step is crucial because it reduces the computational burden of using LLMs by focusing initial efforts on easily identifiable usernames. In doing so, the LLM is applied only to the more complex or ambiguous usernames that cannot be resolved through name-matching alone.
+
+Lastly, for the remaining unmatched usernames, an LLM is used to infer the most likely gender. This is performed using the OpenAI API through the *ellmer* R package. To further optimize computational efficiency, the LLM is applied exclusively to the set of unique usernames. In cases where a commenter appears multiple times in the dataset (i.e., posts multiple comments), gender prediction is conducted once for the unique username and subsequently assigned to all corresponding observations.
+
+To partially address the limitations of this method, an additional "unknown" category is introduced. When no confident gender match can be established—either through the name-matching step or the LLM—the gender is labeled as "unknown." This helps mitigate risks related to forced or uncertain classifications.
+
+The code is first run on a subset of 100 obs of the dataset and an evaluation of this method is performed to verify the efficiency of the assigning gender procedure.
+
+```{r, include=FALSE}
+## Try to assign the gender to the remaining names
+
+library(ellmer) # For your OpenAI API access
+
+# Assuming italian_names and final_dataset are already prepared
+
+# Step 1: Identify and handle usernames not matched by the dictionary
+process_unknown_names <- function(dataset, batch_size = 100) {
+  # Create a copy to work with
+  result_dataset <- dataset
+  
+  # Identify usernames with unknown gender
+  unknown_indices <- which(result_dataset$predicted_gender == "unknown")
+  
+  if (length(unknown_indices) == 0) {
+    return(result_dataset) # No unknown names to process
+  }
+  
+  # Extract unique usernames with unknown gender to minimize API calls
+  unique_unknown_usernames <- unique(result_dataset$authorDisplayName[unknown_indices])
+  cat(sprintf("Found %d unique usernames with unknown gender\n", length(unique_unknown_usernames)))
+  
+  # Prepare lookup table for results
+  gender_lookup <- data.table(
+    username = character(),
+    api_gender = character()
+  )
+  
+  # Process in batches
+  num_batches <- ceiling(length(unique_unknown_usernames) / batch_size)
+  cat(sprintf("Processing in %d batches of %d names each\n", num_batches, batch_size))
+  
+  for (i in 1:num_batches) {
+    # Get current batch
+    start_idx <- (i-1) * batch_size + 1
+    end_idx <- min(i * batch_size, length(unique_unknown_usernames))
+    current_batch <- unique_unknown_usernames[start_idx:end_idx]
+    
+    cat(sprintf("Processing batch %d of %d (%d names)\n", i, num_batches, length(current_batch)))
+    
+    # Set API key
+    Sys.setenv(OPENAI_API_KEY = "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")  # Replace with your OpenAI API key
+    
+    # Create chat object
+    chat <- ellmer::chat_openai(
+      system_prompt = "You are an expert in recognizing Italian and foreign first names and determining gender.",
+      model = "gpt-4o-mini"
+    )
+    
+    # Format the names for the prompt
+    names_list <- paste(current_batch, collapse = "\n")
+    
+    # Send batch prompt
+    response <- chat$chat(
+      sprintf("Below is a list of YouTube usernames. For each username, try to extract a likely first name if present and determine its gender. Respond with only these usernames and appropriate gender label (male, female, or unknown) in CSV format: username,gender\n\n%s", names_list)
+    )
+    
+    # Parse the response
+    response_lines <- unlist(strsplit(trimws(response), "\n"))
+    batch_results <- data.table(
+      username = character(),
+      api_gender = character()
+    )
+    
+    for (line in response_lines) {
+      parts <- unlist(strsplit(line, ","))
+      if (length(parts) >= 2) {
+        username <- trimws(parts[1])
+        gender <- tolower(trimws(parts[2]))
+        if (!gender %in% c("male", "female", "unknown")) gender <- "unknown"
+        
+        # Add to batch results
+        batch_results <- rbind(batch_results, data.table(
+          username = username,
+          api_gender = gender
+        ))
+      }
+    }
+    
+    # Add batch results to lookup table
+    gender_lookup <- rbind(gender_lookup, batch_results)
+    
+    # Optional: Add a small delay to avoid rate limiting
+    Sys.sleep(0.5)
+  }
+  
+  # Merge API results with dataset
+  result_dataset <- merge(
+    result_dataset, 
+    gender_lookup, 
+    by.x = "authorDisplayName", 
+    by.y = "username", 
+    all.x = TRUE
+  )
+  
+  # Update predicted gender with API results for unknowns
+  result_dataset$final_gender <- ifelse(
+    result_dataset$predicted_gender == "unknown" & !is.na(result_dataset$api_gender),
+    result_dataset$api_gender,
+    result_dataset$predicted_gender
+  )
+  
+  # Clean up intermediate columns if desired
+  result_dataset$api_gender <- NULL
+  
+  return(result_dataset)
+}
+
+prova_dataset_with_api <- process_unknown_names(prova, batch_size = 50)
+```
+
+```{r}
+
+#Evaluation 
+true_gender = read.xlsx("true.gender.xlsx")
+#Confusion Matrix 
+library(caret)
+
+# Convert predicted and true gender into factors (ensuring same levels
+true_gender$true_gender <- factor(true_gender$true_gender, levels = c("male", "female", "unknown"))
+true_gender$final_gender <- factor(true_gender$final_gender, levels = c("male", "female", "unknown"))
+
+# Compute Confusion Matrix
+conf_matrix <- confusionMatrix(true_gender$final_gender,true_gender$true_gender)
+
+#The accuracy is quite high (86%), meaning that the model correctly classifies most cases. Sensitivity is perfect for "male" 
+#and high for "female", but lower for "unknown", indicating the model struggles to detect some "unknown" cases. 
+#Specificity is very high across all classes, especially for "unknown" (1.0), suggesting very few false positives. 
+#Precision is overall good; the "male" class has the lowest precision (0.76), meaning some usernames predicted as "male" 
+#may actually belong to other categories. The model tends to prefer assigning a gender (male/female) over the "unknown" 
+#category, which might be influenced by the prompt that encourages predicting the most probable gender based on the username. 
+#Overall, the model is statistically solid and reliable for gender classification, but could be improved in detecting 
+#"unknown" cases more effectively.
+```
+
+\newpage
+
+| Metric                   | male             | female | unknown |
+|--------------------------|------------------|--------|---------|
+| **True Positives (TP)**  | 29               | 39     | 18      |
+| **False Negatives (FN)** | 0                | 0      | 5       |
+| **False Positives (FP)** | 5                | 5      | 0       |
+| **Accuracy**             | 0.86             |        |         |
+| **95% CI**               | (0.7763, 0.9213) |        |         |
+|                          |                  |        |         |
+| **Sensitivity**          | 1.0000           | 0.8732 | 0.7632  |
+| **Specificity**          | 0.9070           | 0.9123 | 1.0000  |
+| **Precision (PPV)**      | 0.7632           | 0.8864 | 1.0000  |
+
+: Confusion Matrix
+
+The model achieves a strong overall accuracy of 86%, indicating that most cases are classified correctly. Sensitivity is perfect for the "male" class and high for "female," while it is lower for "unknown," showing that the model struggles to capture some "unknown" cases. Specificity is excellent across all classes, particularly for "unknown" (1.0), reflecting a minimal false positive rate.
+
+Precision is generally good, though slightly lower for the "male" class (0.76), suggesting that some usernames classified as "male" may belong to other categories. The model appears more inclined to assign a gender (male/female) rather than labeling users as "unknown," likely influenced by a prompt encouraging gender predictions based on probable name associations.
+
+In summary, the model is statistically solid and reliable for gender classification, but could benefit from improved detection of the "unknown" class to reduce over-assignment to binary gender categories. For further details, including additional performance metrics and visualizations, see the Appendix.
+
+```{r}
+#| fig-cap: "Distribution of Predicted Gender "
+ggplot(true_gender, aes(x = final_gender, fill = final_gender)) +
+  geom_bar() +
+  labs( x = "Gender", y = "Count") +
+  theme_minimal()
+```
+
+The bar chart shows the distribution of predicted genders in the test dataset following the gender assignment procedure. The majority of usernames were classified as "female" (over 40 cases), followed by "male". A smaller but still relevant portion were assigned to the "unknown" category.
+
+This suggests that while the model tends to successfully assign a binary gender (male or female) in most cases, there is a notable fraction of usernames for which the model could not confidently infer gender, resulting in an "unknown" label. This aligns with the earlier observation that the model is somewhat conservative when uncertain, but still shows a tendency to prefer gendered classifications over "unknown."
+
+Since the evaluation confirmed the reliability of the method, the procedure is applied to the full dataset. To speed up the process and reduce the risk of connection errors, the dataset is split into subsets of approximately 5,000 observations. Within each subset, the procedure is run in smaller batches of 50 observations, which are then combined. The corresponding code is provided in the Appendix, and the prompt used for this procedure is also available in the Quarto file. Finally, all subsets are merged into a single dataset, which now includes a new column called **final_gender**, a categorical variable with three possible values: "female," "male," and "unknown."
+
+```{r}
+file_list <- list.files( full.names = TRUE, pattern = "^df_.*\\.xlsx$")
+
+data <- lapply(file_list, function(file) {
+  read_excel(file) %>%
+    mutate(source_file = basename(file)) %>%
+    filter(!is.na(textOriginal))
+}) %>%
+  bind_rows()
+
+```
+
+The final unit of analysis for this study is the individual YouTube comment. Each comment represents a unique instance of user-generated content and serves as the primary level at which data is collected and analyzed. By focusing on single comments, the study captures expressions of public sentiment, allowing for the examination of how users engage with and react to media coverage of femicide cases.
+
+### Emoji Translation
+
+An additional challenge in the data cleaning process involves the treatment of emojis. Given that one of the objectives of this study is to conduct a sentiment analysis, it is inappropriate to disregard emojis entirely, as they convey emotional and contextual details. However, for other descriptive analyses, such as word cloud visualizations, retaining emojis could introduce noise or distort the interpretability of textual patterns.
+
+To address this, two versions of the comment text are created. The first version excludes emojis entirely, retaining only the plain text. The second version replaces each emoji with its corresponding textual description. A key obstacle in this process is the need to generate accurate emoji descriptions in Italian, as the initial description dataset contains emoji labels in English.
+
+The adopted procedure consists of loading the English-language emoji description dataset, which contains 5,042 observations, and subsequently translating these descriptions into Italian. The translation is performed using the OpenAI API, where the English descriptions are processed in batches of 50 observations to ensure accurate and context-sensitive translations. Full details of the procedure, including the exact prompt and workflow, are documented in the Appendix.
+
+By checking the lenght of the resulting translation vector, it is observed that six translations are missing. These missing entries are manually detected and completed to ensure consistency with the formatting and structure of the existing translations.
+
+To minimize potential bias in subsequent analyses, certain terms recurrent in the emoji descriptions, such as "woman," "man," "skin," "face," and "flag", are removed from the text, as their inclusion could disproportionately influence sentiment analysis outcomes.
+
+The final dataset contains two additional columns: **Erase_Emoji** and **Rep_Emoji**. The Erase_Emoji column contains comments where emojis have been removed, leaving only the pure text. In this version, each emoji is replaced with an empty space, which also avoids generating NA values in cases where comments consist solely of emojis. The Rep_Emoji column contains comments where each emoji has been substituted with its corresponding Italian description, preserving the semantic contribution of emojis for sentiment analysis purposes.
+
+```{r, eval=FALSE}
+# The scraping code used here is sourced directly from Nicolò Compagnoli's repository (https://github.com/NicoCampa/YoutubeAPI_project) 
+# and is integrated without modifications.
+
+#From here
+#scrap the latest version of emojis
+emoji <- readLines("https://www.unicode.org/Public/emoji/latest/emoji-test.txt",
+          encoding="UTF-8") %>%
+  stri_subset_regex(pattern = "^[^#]") %>%
+  stri_subset_regex(pattern = ".+")
+
+#extract the emoji character
+emoji.chars <- emoji %>%
+  stri_extract_all_regex(pattern = "# *.{1,2} *") %>%
+  stri_replace_all_fixed(pattern = c("*", "#"),
+                         replacement = "",
+                         vectorize_all=FALSE) %>%
+  stri_trim_both()
+
+#extract the emoji description
+emoji.descriptions <- emoji %>%
+  stri_extract_all_regex(pattern = "#.*$") %>%
+  stri_replace_all_regex(pattern = "^#.*?E\\d+\\.\\d+\\s+",
+                         replacement = " ") 
+
+# I added a white space to deal with people using emojis right after a word
+# without spacing. It can cause double white spaces when people properly put a
+# space between a word and an emoji. But it's not a big deal because those 
+# additional spaces can be removed easily in the text cleaning part.
+# tm_map(corpus, stripWhitespace) can be used for that matter from the tm pkg
+
+#To here
+
+#The emoji translation step is included in the appendix
+
+emoji_data <- read.table(
+  "emoji_tradotte.txt",
+  skip = 1,
+  sep = "",
+  quote = "\"",
+  stringsAsFactors = FALSE
+)
+emoji.transl <- emoji_data$V2
+
+#remove the problematic words that might introduce biases and problems in the analysis
+words_to_remove <- c("uomo", "donna", "faccia", "carnagione", "pelle", "che", "con", "viso", "del", "della", "dello", "bandiera", "occhi")
+patterns <- paste0("\\b", words_to_remove, "\\b")
+# Use Reduce to apply gsub sequentially
+emoji.transl <- Reduce(function(x, pattern) {
+  gsub(pattern, " ", x, ignore.case = TRUE)
+}, patterns, init = emoji.transl)
+
+
+data$Rep_Emoji <- stri_replace_all_regex(data$textOriginal, #replace with yours case
+                               pattern = emoji.chars,
+                               replacement = emoji.transl,
+                               vectorize_all=FALSE)
+
+data$Erase_Emoji <- stri_replace_all_regex(data$textOriginal, #replace with yours case
+                               pattern = emoji.chars,
+                               replacement = " ",
+                               vectorize_all=FALSE)
+```
+
+### Most Active Users
+
+```{r}
+## Create a column to distinguish among most active users and non 
+data <- data %>% 
+  group_by(authorDisplayName) %>% 
+  mutate(active_users = if_else(n()<=3, 0, 1)) %>% 
+  ungroup()
+#total number of single usernames under the videos length(unique(data$authorDisplayName))
+```
+
+During the data cleaning process, it was also observed that several comments were written by the same users. Specifically, there are 21,860 unique users out of a total of 40,224 comments. Therefore, it is useful to differentiate between highly active users and less active ones in some parts of the analysis. To this end, a new column called **active_users** was created, assigning a value of 1 to users who wrote more than 3 comments, and 0 otherwise.
+
+### Sentiment Analysis
+
+When interpreting text, readers rely heavily on the emotional tone conveyed by words to determine whether the content is positive, negative, or expresses a more nuanced emotion such as surprise, anger, or sadness. In computational analysis, this process can be automated through text mining techniques that assess emotional content. A common approach involves breaking the text into individual tokens (words) and aggregating the sentiment scores of each token to infer the overall sentiment of a sentence or document. While several methods exist for sentiment analysis, this token-based approach is widely used due to its compatibility with many available tools.
+
+To measure the sentiment of individual words, various sentiment lexicons (also known as dictionaries) are available. These lexicons categorize words according to emotional labels, ranging from basic positive/negative polarity to more detailed emotion categories. In this analysis, two lexicons were employed:
+
+-   *NRC Sentiment Lexicon* :Developed by the National Research Council of Canada, the NRC lexicon categorizes words based on the emotions they evoke, including positive, negative, anger, fear, joy, sadness, surprise, and trust. Each word is assigned a binary score—1 if it expresses a specific emotion, 0 otherwise. The Italian version of this lexicon, available via the *syuzhet* R package, was used for this project. The most frequently applied functions from this package were *get_nrc_sentiment()*, which returns an emotion score table for each word or sentence, and *get_sentiment()*, which provides an overall sentiment score for full sentences.
+
+-   *Italian Sentiment Lexicon*: Created by the Consiglio Nazionale delle Ricerche (CNR), this lexicon is available on the official CNR website and was imported into R using the *.lmf* format. Unlike the NRC lexicon, it assigns words into three categories: positive, neutral, and negative. Despite its simpler classification system, it has been found to perform more accurately in certain contexts than the NRC lexicon.
+
+The code used to import and apply both lexicons is available in the appendix.
+
+Another challenge encountered during the analysis was how to handle plurals, gender variations (masculine and feminine), and different conjugations of the same verb. To address this issue, *stemming* was applied, a common text preprocessing technique in sentiment analysis that reduces words to their root or base form by removing suffixes or prefixes. For instance, "running," "runs," and "ran" are all reduced to the stem "run." This process helps consolidate word variations so they are treated as a single term, improving model performance by reducing vocabulary size and noise. To avoid displaying truncated or hard-to-read stems in the final output, the word with the highest frequency from the group is usually shown, while its frequency count reflects the combined total of all stemmed word forms.
+
+## Results
+
+### Exploratory Analysis
+
+As an initial step, a word cloud analysis is conducted to explore the most frequent words in the dataset. To do so, multiple corpora were created: one for the entire dataset, one for male users, one for female users, one for the most active users, and one for the less active users. The word clouds are based exclusively on the text without emojis, as including emojis would have oversaturated the visualization. In addition to the standard stopwords provided by the *tm* R package, further common words were removed. For example, terms such as "cosa/cose" (meaning "thing/things" in Italian) were excluded due to their high frequency and limited contribution to the interpretability of the results.
+
+```{r}
+##' Create Corpus and Tokenization ####
+##' for different splits of the data
+##' (dataset erased, dataset con emoji, dataset con negation words ) 
+load("data_aiuto.Rdata")
+process_text_data <- function(data,
+                              text_column,
+                              language = "it",
+                              sparse_thresh = 0.99,
+                              remove_words = tm::stopwords('it')) {
+  # Convert column to vector
+  text_vector <- data[[text_column]]
+  
+  # Create corpus
+  corpus <- Corpus(VectorSource(text_vector),
+                   readerControl = list(language = language))
+  
+  # Preprocessing pipeline
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, removeNumbers)
+  corpus <- tm_map(corpus, removeWords, c(remove_words))
+  corpus <- tm_map(corpus, content_transformer(str_replace_all), '-', ' ')
+  corpus <- tm_map(corpus, content_transformer(function(x) str_replace_all(x, "[[:punct:]]", " "))) #remove punctuation
+  corpus <- tm_map(corpus, stripWhitespace)
+  
+  # Term-Document Matrix and sparsity reduction
+  tdm <- TermDocumentMatrix(corpus)
+  tdm_reduced <- removeSparseTerms(tdm, sparse = sparse_thresh)
+  m <- as.matrix(tdm_reduced)
+  
+  # Create output objects
+  df_corpus <- data.frame(text = sapply(corpus, as.character),
+                          stringsAsFactors = FALSE)
+  v <- sort(rowSums(m), decreasing = TRUE)
+  d <- data.frame(word = names(v), freq = v)
+  
+  # Tokenize and clean tokens
+  wordTokens <- df_corpus %>%
+    unnest_tokens(word, text, drop = FALSE) %>%
+    select(-text) %>%
+    filter(!str_detect(word, '\\d')) %>% # remove words with digits
+    filter(nchar(word) > 1)              # remove words shorter than 2 letters
+  
+  
+  # Return as a list
+  return(
+    list(
+      corpus = corpus,
+      tdm = tdm,
+      tdm_reduced = tdm_reduced,
+      term_matrix = m,
+      df_corpus = df_corpus,
+      word_freq = d,
+      word_tokens = wordTokens
+    )
+  )
+}
+corpus_result_erased <- process_text_data(data, "Erase_Emoji" , remove_words = c(tm::stopwords('it'), "così", "cosa", "cose", "essere"))
+corpus_result_erased_male <- process_text_data(data[data$final_gender == "male",], "Erase_Emoji" , remove_words = c(tm::stopwords('it'), "così", "cosa", "cose", "essere"))
+corpus_result_erased_female <- process_text_data(data[data$final_gender == "female",], "Erase_Emoji" , remove_words = c(tm::stopwords('it'), "così", "cosa", "cose", "essere"))
+
+stemmed_words_erased <- corpus_result_erased$word_freq %>%
+  mutate(stem = wordStem(word, language = "italian"))
+stemmed_words_erased_male <- corpus_result_erased_male$word_freq %>%
+  mutate(stem = wordStem(word, language = "italian"))
+stemmed_words_erased_female <- corpus_result_erased_female$word_freq %>%
+  mutate(stem = wordStem(word, language = "italian"))
+# For each stem, find the most frequent original word
+highest_freq_words_erased <- stemmed_words_erased %>%
+  group_by(stem) %>%
+  mutate(total_stem_freq = sum(freq)) %>%
+  arrange(stem, desc(freq)) %>%
+  slice(1) %>%  # Keep only the highest frequency word per stem
+  mutate(freq = total_stem_freq) %>% 
+  ungroup() %>%# Use the total frequency for the stem
+  select(word, freq) %>%
+  arrange(desc(freq))
+
+highest_freq_words_erased_male <- stemmed_words_erased_male %>%
+  group_by(stem) %>%
+  mutate(total_stem_freq = sum(freq)) %>%
+  arrange(stem, desc(freq)) %>%
+  slice(1) %>%  # Keep only the highest frequency word per stem
+  mutate(freq = total_stem_freq) %>% 
+  ungroup() %>%# Use the total frequency for the stem
+  select(word, freq) %>%
+  arrange(desc(freq))
+
+highest_freq_words_erased_female <- stemmed_words_erased_female %>%
+  group_by(stem) %>%
+  mutate(total_stem_freq = sum(freq)) %>%
+  arrange(stem, desc(freq)) %>%
+  slice(1) %>%  # Keep only the highest frequency word per stem
+  mutate(freq = total_stem_freq) %>% 
+  ungroup() %>%# Use the total frequency for the stem
+  select(word, freq) %>%
+  arrange(desc(freq))
+
+corpus_result_erased_active <- process_text_data(data[data$active_users == 1,], "Erase_Emoji" , remove_words = c(tm::stopwords('it'), "così", "cosa", "cose", "essere"))
+corpus_result_erased_normal <- process_text_data(
+  data[data$active_users == 0, ], 
+  "Erase_Emoji", 
+  remove_words = c(tm::stopwords('it'), "così", "cosa", "cose", "essere")
+)
+stemmed_words_erased_active <- corpus_result_erased_active$word_freq %>%
+  mutate(stem = wordStem(word, language = "italian"))
+stemmed_words_erased_normal <- corpus_result_erased_normal$word_freq %>%
+  mutate(stem = wordStem(word, language = "italian"))
+# For each stem, find the most frequent original word
+highest_freq_words_erased_active <- stemmed_words_erased_active %>%
+  group_by(stem) %>%
+  mutate(total_stem_freq = sum(freq)) %>%
+  arrange(stem, desc(freq)) %>%
+  slice(1) %>%  # Keep only the highest frequency word per stem
+  mutate(freq = total_stem_freq) %>% 
+  ungroup() %>%# Use the total frequency for the stem
+  select(word, freq) %>%
+  arrange(desc(freq))
+highest_freq_words_erased_normal <- stemmed_words_erased_normal %>%
+  group_by(stem) %>%
+  mutate(total_stem_freq = sum(freq)) %>%
+  arrange(stem, desc(freq)) %>%
+  slice(1) %>%  # Keep only the highest frequency word per stem
+  mutate(freq = total_stem_freq) %>% 
+  ungroup() %>%# Use the total frequency for the stem
+  select(word, freq) %>%
+  arrange(desc(freq))
+
+```
+
+```{r,eval=FALSE }
+#| fig-cap: "WordCloud of the complete dataset"
+my_graph <- wordcloud2(data = highest_freq_words_erased %>% 
+             filter(freq >= 800), size = 0.5, 
+           backgroundColor = "white", shape = "circle")
+saveWidget(my_graph, "tmp.html", selfcontained = F)
+webshot("tmp.html", "wc1.png", delay = 5, vwidth = 700, vheight = 520)
+
+```
+
+![WordCloud of the complete dataset](wc1.png)
+
+In this word cloud, only words with a frequency greater than 800 occurrences are displayed. The most frequent word is "Giulia", appearing 4,878 times, which is expected since both victims shared this name and it was widely mentioned in the comments. Other highly frequent words include "donne" (4,689 occurrences), meaning "women," and "ragazza" (3,625 occurrences), meaning "girl," reflecting the fact that both victims were young women. The word "figlio" (4,147 occurrences), meaning "son," also appears frequently. This could be attributed to two reasons: many comments refer to the pain a parent feels when losing a child, supported by the high frequency of the word "dolore" (meaning "pain"), and because Giulia Tramontano was seven months pregnant when she was killed. Other notable words include "povera" (meaning "poor" but in this context has the sense of unfortunate girl), "vita" (meaning "life"), and "mostro" (meaning "monster"). In addition, a bar plot showing the frequencies of the 15 most common words is available in the appendix.
+
+```{r,eval=FALSE}
+my_graph <- wordcloud2(data = highest_freq_words_erased_male %>% 
+             filter(freq >= 400), size = 0.5, 
+           backgroundColor = "white", shape = "circle")
+saveWidget(my_graph, "tmp.html", selfcontained = F)
+webshot("tmp.html", "wc2.png", delay = 5, vwidth = 700, vheight = 520)
+```
+
+```{r, eval=FALSE}
+my_graph <- wordcloud2(data = highest_freq_words_erased_female %>% 
+             filter(freq >= 400), size = 0.5, 
+           backgroundColor = "white", shape = "circle")
+saveWidget(my_graph, "tmp.html", selfcontained = F)
+webshot("tmp.html", "wc3.png", delay = 5, vwidth = 700, vheight = 520)
+```
+
+::::: {.columns layout-ncol="2"}
+::: column
+![WordCloud of the male users](wc2.png)
+:::
+
+::: column
+![WordCloud of the female users](wc3.png)
+:::
+:::::
+
+These two word clouds include only words with a frequency greater than 400 occurrences. The first noticeable difference is that female users likely wrote longer comments or repeated certain words more often, as their word cloud contains a larger number of words. An interesting observation is the prominence of the word "mamma" (mom) in the female word cloud, which is absent from the male one. On the other hand, the word "Italia" (Italy) appears in the male word cloud but not in the female one. The most frequent word among female users is still "Giulia", while among male users, it is "donne" (women). Notably, the word "povera" (in this context meaning unfortunate girl) appears more than twice as often in the female word cloud compared to the male one.
+
+```{r, eval=FALSE}
+my_graph <- wordcloud2(data = highest_freq_words_erased_active %>% 
+             filter(freq >= 650), size = 0.5, 
+           backgroundColor = "white", shape = "circle")
+saveWidget(my_graph, "tmp.html", selfcontained = F)
+webshot("tmp.html", "wc4.png", delay = 5, vwidth = 700, vheight = 520)
+```
+
+```{r, eval=FALSE}
+my_graph <- wordcloud2(data = highest_freq_words_erased_normal %>% 
+             filter(freq >= 650), size = 0.5, 
+           backgroundColor = "white", shape = "circle")
+saveWidget(my_graph, "tmp.html", selfcontained = F)
+webshot("tmp.html", "wc5.png", delay = 5, vwidth = 700, vheight = 520)
+```
+
+::::: {.columns layout-ncol="2"}
+::: column
+![WordCloud of the Most Active Users](wc4.png)
+:::
+
+::: column
+![WordCloud of the Less Active Users](wc5.png)
+:::
+:::::
+
+It is now possible to compare the word clouds of the most active and less active users. In this comparison, only words with a frequency higher than 650 occurrences are considered. The word cloud of the most active users displays fewer unique words, suggesting a tendency to repeat the same terms more frequently, while less active users appear to use a broader range of vocabulary. The word "Giulia" emerges as the most frequent term among the most active users, whereas "donne" (women) is the most common word among less active users. The word "uomo" (man) is notably present in the word cloud of less active users but does not appear among the most active ones. In addition, the word cloud of less active users includes more dramatic terms such as "mostro" (monster), "ergastolo" (life imprisonment), "morte" (death), and "male" (evil), which are absent from the word cloud of the most active users.
+
+### Positive and Negative Words
+
+```{r}
+#Top positive and negative words##
+
+#Load the dictionaries
+nrc_lex <- get_sentiment_dictionary(dictionary = "nrc", language = "italian")
+cnr_lex <- read.csv("cnr_lexicon_ita.csv")
+
+plot_top_sentiment_words <- function(stemmed_words, lexicon_df, top_n_words = 15, nrc = FALSE) {
+  
+  # Aggregate by stem (take most frequent word per stem)
+  highest_freq_words <- stemmed_words %>%
+    group_by(stem) %>%
+    mutate(total_stem_freq = sum(freq)) %>%
+    arrange(stem, desc(freq)) %>%
+    slice(1) %>%  # Keep only the highest frequency word per stem
+    mutate(freq = total_stem_freq) %>% 
+    ungroup() %>%
+    select(word, freq)
+  
+  # Join with lexicon and count with weights
+  wordSentiment <- highest_freq_words %>%
+    inner_join(lexicon_df, by = c('word' = 'word')) %>%
+    count(word, sentiment, wt = freq, sort = TRUE)
+  
+  if (nrc) {
+    # Positive/Negative plot
+    word_sent_top_nrc <- wordSentiment %>%
+      filter(sentiment %in% c("positive", "negative")) %>%
+      group_by(sentiment) %>%
+      top_n(10, n) %>%
+      ungroup() %>%
+      mutate(word = reorder(word, n))
+    
+    p1 <- ggplot(word_sent_top_nrc, aes(x = word, y = n, fill = sentiment)) +
+      geom_col(show.legend = FALSE) +
+      facet_grid(~sentiment, scales = 'free_x') +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      labs(
+        x = "",
+        y = "Frequency",
+        title = "Top 10 Positive & Negative Words (NRC)"
+      )
+    
+    # Emotions plot
+    word_emo_top_nrc <- wordSentiment %>%
+      filter(!sentiment %in% c("positive", "negative")) %>%
+      group_by(sentiment) %>%
+      top_n(5, n) %>%
+      ungroup() %>%
+      mutate(word = reorder(word, n))
+    
+    p2 <- ggplot(word_emo_top_nrc, aes(x = word, y = n, fill = sentiment)) +
+      geom_col(show.legend = FALSE) +
+      facet_grid(~sentiment, scales = 'free_x') +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      labs(
+        x = "",
+        y = "Frequency",
+        title = "Top 5 Words by Emotion (NRC)"
+      )
+    
+    # Combine plots vertically
+    combined_plot <- p1 / p2 + plot_layout(heights = c(1, 1.2))
+    
+    return(combined_plot)
+    
+  } else {
+    word_sent_top <- wordSentiment %>%
+      group_by(sentiment) %>%
+      top_n(top_n_words, n) %>%
+      ungroup() %>%
+      mutate(word = reorder(word, n))
+    
+    p <- ggplot(word_sent_top, aes(x = word, y = n, fill = sentiment)) +
+      geom_col(show.legend = FALSE) +
+      facet_grid(~sentiment, scales = 'free_x') +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      labs(
+        x = "",
+        y = "Frequency"
+      )
+    
+    return(p)
+  }
+}
+
+corpus_erased <- process_text_data(data, "Rep_Emoji" , remove_words = c(tm::stopwords('it'), "così", "cosa", "cose", "essere"))
+corpus_erased_male <- process_text_data(data[data$final_gender == "male",], "Rep_Emoji" , remove_words = c(tm::stopwords('it'), "così", "cosa", "cose", "essere"))
+corpus_erased_female <- process_text_data(data[data$final_gender == "female",], "Rep_Emoji" , remove_words = c(tm::stopwords('it'), "così", "cosa", "cose", "essere"))
+
+stemmed_erased <- corpus_erased$word_freq %>%
+  mutate(stem = wordStem(word, language = "italian"))
+stemmed_erased_male <- corpus_erased_male$word_freq %>%
+  mutate(stem = wordStem(word, language = "italian"))
+stemmed_erased_female <- corpus_erased_female$word_freq %>%
+  mutate(stem = wordStem(word, language = "italian"))
+
+corpus_erased_active <- process_text_data(data[data$active_users == 1,], "Rep_Emoji" , remove_words = c(tm::stopwords('it'), "così", "cosa", "cose", "essere"))
+corpus_erased_normal <- process_text_data(
+  data[data$active_users == 0, ], 
+  "Rep_Emoji", 
+  remove_words = c(tm::stopwords('it'), "così", "cosa", "cose", "essere")
+)
+stemmed_erased_active <- corpus_result_erased_active$word_freq %>%
+  mutate(stem = wordStem(word, language = "italian"))
+stemmed_erased_normal <- corpus_result_erased_normal$word_freq %>%
+  mutate(stem = wordStem(word, language = "italian"))
+```
+
+This section presents an analysis of the most positive and negative words within the entire dataset, as well as across each of the subgroups under consideration. The analysis is performed using both lexicons, and the text version containing the translated emoji descriptions is employed, as emojis are frequently linked to emotions and sentiment, making their inclusion in the analysis appropriate. For this purpose, a separate corpus is created and stemmed for each subgroup.
+
+```{r}
+#| fig-cap: "Word Frequencies based on the NRC Sentiment Lexicon"
+plot_top_sentiment_words(stemmed_erased, nrc_lex, top_n_words = 5, nrc = TRUE)
+```
+
+The first plot displays the Top 10 positive and negative words in the complete dataset. The negative words are notably more frequent, with "dolore" (pain) and "male" (evil) being the most prominent, followed by "carcere" (prison), "assassino" (murderer), and "morte" (death). This reflects the heavy emotional and violent nature of the topic discussed (femicides). On the positive side, terms such as "gioia" (joy), "vera" (true), and "famiglia" (family) are present, but their frequencies are considerably lower than the negative words, highlighting a general negative emotional tone in the comments.
+
+The second plot breaks down the top 5 words by specific emotions according to the NRC categories (e.g., anger, fear, sadness). As expected, "sadness" and "fear" categories contain highly frequent words, including "dolore", "morte", and "assassino", aligning with the tragic nature of the femicide cases. The "anger" category includes "omicidio" (homicide) and "assassino", pointing to a strong emotional response from commenters. The "joy", "anticipation", and "trust" categories are much less populated, reinforcing the overall dominance of negative emotional expressions in the dataset.
+
+Overall, the plots suggest that the public's online reactions to the femicide cases are predominantly characterized by negative emotions such as sadness, anger, and fear.
+
+```{r}
+#| fig-cap: "Word Frequencies based on the Italian Sentiment Lexicon"
+plot_top_sentiment_words(stemmed_erased, cnr_lex, top_n_words = 5)
+
+```
+
+In the italian Sentiment Lexicon, within the negative sentiment group, terms such as "dolore" (pain), "male" (evil), and "solo" (alone) are dominant, though their frequencies appear lower compared to the negative words highlighted in the NRC-based plot. The neutral sentiment section features common words like "vita" (life) and "persona" (person). In the positive sentiment section, words such as "cuore" (heart), "bene" (good), and "gioia" (joy) appear more frequently than the positive terms identified by the NRC lexicon. It is important to highlight that these positive words originate from the translated emoji descriptions. For example, "heart" does not necessarily convey a strictly positive sentiment, but may instead reflect a virtual expression of empathy toward the situation.
+
+Compared to the NRC lexicon plot, the Italian Sentiment Lexicon displays a more balanced distribution, with stronger representation of both neutral and positive words. While the NRC lexicon concentrated on specific emotional categories such as anger, fear, and sadness, the Italian lexicon provides a broader polarity perspective (negative, neutral, positive). This results in a less skewed output and highlights additional positive and neutral terms that the NRC lexicon might have underrepresented. For example, words like "cuore" and "rosso" are more prominent in this classification but were less visible in the NRC analysis, reflecting differences in how each lexicon captures figurative or symbolic language. Overall, this comparison suggests that the Italian Sentiment Lexicon offers a complementary perspective, capturing not only the negativity associated with the topic but also the more neutral and positive nuances present in the comments.
+
+```{r}
+#| fig-cap: "Sentiments expressed by Male Users"
+plot_top_sentiment_words(stemmed_erased_male , nrc_lex, top_n_words = 5, nrc= TRUE)
+```
+
+Moving on with the analysis comparing male and female users, a clear trend emerges. Negative terms dominate the chart, with "male" (evil) and "dolore" (pain) being the most frequent, followed by words such as "carcere" (prison), "assassino" (murderer), and "morte" (death). These terms highlight a strong negative emotional reaction, which is expected given the severity of the femicide cases discussed. In contrast, positive terms like "gioia" (joy), "vera" (true), and "famiglia" (family) appear less frequently, suggesting that male users' comments tend to focus more on the tragic and violent aspects rather than on hopeful or empathetic expressions.
+
+Emotions like sadness, fear, and anger are prominent. In particular, the sadness category includes frequent words such as "dolore", "morte", and "assassino", while fear and anger include terms like "male", "carcere", and "omicidio" (homicide). The presence of words under surprise and trust is much more limited, and joy appears mostly with lower frequencies.
+
+Overall, male users’ comments seem predominantly characterized by negative emotions, especially sadness and anger. This pattern suggests a discourse focused on the gravity and brutality of the events, with less space given to expressions of compassion or positivity.
+
+```{r}
+#| fig-cap: "Sentiments expressed by Female Users"
+plot_top_sentiment_words(stemmed_erased_female , nrc_lex, top_n_words = 5, nrc= TRUE)
+```
+
+As with male users, negative words dominate, with "dolore" (pain) and "male" (evil) being the most frequent, followed by "carcere" (prison), "mostro" (monster), and "assassino" (murderer). However, compared to male users, female commenters seem to use "dolore" at a significantly higher frequency. Additionally, words like "paura" (fear) and "mamma" (mom) emerge strongly here, which were less prominent or absent among male users. This could suggest that female users are expressing more emotional and empathetic reactions in relation to the victims and the broader context of violence.
+
+In terms of positive sentiment, words like "gioia" (joy), "famiglia" (family), "coraggio" (courage), and "vero" (true) appear. Compared to male users, female commenters mention "coraggio" (courage) more frequently, possibly reflecting a tendency to highlight resilience and support, even when discussing tragic events.
+
+As with male users, sadness and fear are dominant, but sadness appears even stronger in this case, as shown by the prominence of "dolore", "morte" (death), and "assassino" under this emotion. Interestingly, the fear and anger categories also show high frequencies, but with the addition of "paura"(fear) under both fear and anger. Female users appear to engage more with words connected to fear and parental empathy, as seen with "mamma" in the fear category.
+
+When compared to male users, female commenters' word choices appear to convey not only anger and sadness but also a notable focus on fear, protection (e.g., "mamma", "bambino"), and expressions of courage and empathy. This may reflect gendered differences in emotional framing, where women are more likely to emphasize emotional and relational aspects in their reactions.
+
+In summary, both male and female users display strong negative sentiment, but female users seem to place additional emphasis on fear, parental themes, and empathy, whereas male users’ comments were more centered on anger and justice-oriented terms like "carcere"(prison) and "assassino"(murderer).
+
+```{r}
+#| fig-cap: "Sentiment between Male Users and Female Users using the Italian Sentiment Lexicon"
+p1 <- plot_top_sentiment_words(stemmed_erased_male , cnr_lex, top_n_words = 5)
+p2 <- plot_top_sentiment_words(stemmed_erased_female , cnr_lex, top_n_words = 5)
+
+(p1|p2)
+```
+
+In the male users' plot (left), the negative sentiment section is led by terms such as "solo" (alone), "male" (evil), and "dolore" (pain), suggesting a focus on feelings of isolation, suffering, and moral judgment. In the positive sentiment section, male users mention "cuore" (heart), "bene" (good), and "gioia" (joy), but with lower frequencies than in the female panel.
+
+In contrast, the female users' plot (right) presents a stronger presence of positive and neutral terms. While "dolore" and "male" still dominate the negative sentiment section, their relative frequencies are lower compared to the male users. The neutral section includes emotionally significant words such as "famiglia" (family) and "mamma" (mom), suggesting a focus on relational and protective language more typical in female discourse. Positive sentiment is more prominent among female users, especially with words like "cuore"(heart), and "forte" (strong), which appear with higher frequencies than in the male group.
+
+Overall, this comparison shows that male users focus slightly more on negative sentiments related to suffering and moral judgment, while female users show a stronger tendency toward expressing relational and emotional values, particularly through neutral and positive terms such as "famiglia," "mamma," "cuore," and "forte." This difference may indicate a more empathetic and nurturing tone in female comments, whereas male comments may lean more toward expressions of pain and condemnation.
+
+In this sense, both lexicons highlight the same overarching trend between male and female users.
+
+The analysis now shifts to exploring the sentiment patterns of the most active and less active users.
+
+```{r}
+#| fig-cap: "Sentiments expressed by Most Active Users"
+plot_top_sentiment_words(stemmed_erased_active , nrc_lex, top_n_words = 5, nrc= TRUE)
+```
+
+In the top chart, negative terms dominate, led by "male" (evil) and "dolore" (pain), followed by "carcere" (prison), "assassino" (murderer), and "morte" (death). Positive words like "famiglia" (family), "vero" (true), and "bambino" (child) appear but with lower frequencies, suggesting that highly active users focus more on the tragic and violent aspects of the events. In the bottom chart, the most frequent emotions are sadness and fear, as shown by words such as "dolore" (pain), "morte" (death), and "assassino" (murderer). The anger and disgust categories are also relevant, with terms like "omicidio" (homicide) and "mostro" (monster) appearing. Positive emotions such as "joy" and "trust" include fewer and less frequent words, such as "rispetto" (respect) and "giustizia" (justice). Overall, the most active users' comments are heavily centered on negative emotions, especially sadness and fear, with limited expression of positive or empathetic sentiment.
+
+```{r}
+#| fig-cap: "Sentiments expressed by Less Active Users"
+plot_top_sentiment_words(stemmed_erased_normal , nrc_lex, top_n_words = 5, nrc= TRUE)
+```
+
+In the top chart, negative terms are predominant, with "dolore" (pain) and "male" (evil) being the most frequent, followed by "carcere" (prison), "mostro" (monster), and "morte" (death). Compared to the most active users, there is a higher frequency of words like "solitudine" (loneliness, appearing as "sola" = alone) and "abbandono" (abandonment, reflected in "abbastanza" = quite/enough as a stemmed form of other words). On the positive side, words such as "famiglia" (family), "rispetto" (respect), and "bambino" (child) appear but with lower frequencies compared to negative terms. In the bottom chart, negative emotions such as sadness, fear, and anger dominate. The sadness category shows very high frequencies for "dolore" (pain), "morte" (death), and "assassino" (murderer). Fear-related terms, such as "carcere" (prison) and "male" (evil), are also present. Overall, less active users express a heavier emotional load, especially through sadness and fear, but also introduce more isolated mentions of justice-related words like "giustizia" (justice) and "pace" (peace) within positive sentiments, suggesting occasional appeals to resolution or empathy.
+
+```{r}
+#| fig-cap: "Sentiment between Most Active Users and Less Active Users using the Italian Sentiment Lexicon"
+f1 <- plot_top_sentiment_words(stemmed_erased_active , cnr_lex, top_n_words = 5)
+f2 <- plot_top_sentiment_words(stemmed_erased_normal , cnr_lex, top_n_words = 5)
+
+(f1|f2)
+```
+
+In the left panel, most active users show a predominance of negative terms such as "solo" (alone), "male" (evil), "troppo" (too much), and "dolore" (pain), reflecting feelings of isolation and emotional distress. The neutral sentiment includes generic and connective terms like "parlare" (to speak), "fare" (to do), and "vita" (life), while positive sentiment is represented by words like "bene" (good), "capire" (to understand), and "subito" (immediately). However, the frequencies of positive words remain lower compared to the negative and neutral ones, suggesting that highly active users tend to repeat emotionally heavy or negative expressions more often.
+
+In the right panel, less active users exhibit a stronger focus on negative terms such as "solo" (alone), "dolore" (pain), and "male" (evil), but with higher frequencies compared to the most active group. The neutral sentiment is dominated by words like "vita" (life), "famiglia" (family), and "diritto" (right), which introduce more relational and societal concepts compared to the most active users. In the positive sentiment group, less active users more frequently mention "giustizia" (justice), "bene" (good), and "capire" (to understand), suggesting that while their comments may focus on negative events, they also express hope for resolution or moral reflection.
+
+Overall, while both groups emphasize negative sentiment, less active users seem to incorporate slightly more references to relational values and justice, while the most active users concentrate on more repetitive and emotionally charged terms like "solo" and "dolore". This confirms the recurrence of similar patterns between the two lexicons, even when analyzing these subgroups.
+
+### Positive and Negative Sentences
+
+This section provides an analysis of the most positive and most negative sentences across the entire dataset and within each subgroup. The analysis is conducted using both lexicons. In this case, two versions of the text are used: one where emojis are replaced with their descriptions, and one where emojis are removed entirely. Separate analyses are then performed on each corresponding corpus.
+
+```{r}
+calculate_sentiment_score <- function(data, text_column, dict, stem = TRUE) {
+  
+  # Tokenize and optionally stem
+  tokenized_data <- data %>%
+    mutate(sentence_id = row_number()) %>%
+    unnest_tokens(word, {{text_column}})
+  
+  if (stem) {
+    tokenized_data <- tokenized_data %>%
+      mutate(stem = wordStem(word, language = "it"))
+    
+    dict <- dict %>%
+      mutate(stem = wordStem(word, language = "it"))
+    
+    joined_data <- tokenized_data %>%
+      left_join(dict %>% select(stem, sentiment), by = "stem")
+    
+  } else {
+    joined_data <- tokenized_data %>%
+      left_join(dict, by = "word")
+  }
+  
+  sentiment_scores <- joined_data %>%
+    mutate(sentiment = ifelse(is.na(sentiment), 0, sentiment)) %>%
+    group_by(sentence_id) %>%
+    summarize(
+      positive_count = sum(sentiment == "positive"),
+      negative_count = sum(sentiment == "negative"),
+      sentiment_score = positive_count - negative_count,
+      .groups = 'drop'
+    ) %>%
+    right_join(data %>% mutate(sentence_id = row_number()), by = "sentence_id") %>%
+    select(-sentence_id)
+  
+  return(sentiment_scores)
+}
+sentences_erased_nrc <- calculate_sentiment_score(data, Erase_Emoji, nrc_lex )
+sentences_rep_nrc <- calculate_sentiment_score(data, Rep_Emoji, nrc_lex) 
+sentences_erased_cnr <- calculate_sentiment_score(data, Erase_Emoji, cnr_lex )
+sentences_rep_cnr <- calculate_sentiment_score(data, Rep_Emoji, cnr_lex)
+
+sentences_female_nrc <- calculate_sentiment_score(data[data$final_gender == "female",], Rep_Emoji, nrc_lex )
+sentences_male_nrc <- calculate_sentiment_score(data[data$final_gender == "male",], Rep_Emoji, nrc_lex )
+
+sentences_female_cnr <- calculate_sentiment_score(data[data$final_gender == "female",], Rep_Emoji, cnr_lex )
+sentences_male_cnr <- calculate_sentiment_score(data[data$final_gender == "male",], Rep_Emoji, cnr_lex )
+
+sentences_active_cnr <- calculate_sentiment_score(data[data$active_users == 1,], Rep_Emoji, cnr_lex )
+sentences_normal_cnr <- calculate_sentiment_score(data[data$active_users == 0,], Rep_Emoji, cnr_lex )
+
+sentences_active_nrc <- calculate_sentiment_score(data[data$active_users == 1,], Rep_Emoji, nrc_lex )
+sentences_normal_nrc <- calculate_sentiment_score(data[data$active_users == 0,], Rep_Emoji, nrc_lex )
+```
+
+```{r}
+#| fig-cap: "Sentences Sentiment without Emoji"
+g1 <- ggplot(sentences_erased_cnr, aes(x = sign(sentiment_score), fill = factor(sign(sentiment_score)))) +
+  geom_bar() +
+  scale_fill_manual(
+    values = c("-1" = "red", "0" = "gray", "1" = "darkgreen"),
+    labels = c("-1" = "Negative", "0" = "Neutral", "1" = "Positive"),
+    name = "Sentiment"
+  ) +
+  labs(
+    title = "Sentiment Scores - CNR",
+    x = "Sentiment Score",
+    y = "Number of Sentences"
+  ) +
+  theme_minimal()
+
+# Second plot
+g2 <- ggplot(sentences_erased_nrc, aes(x = sign(sentiment_score), fill = factor(sign(sentiment_score)))) +
+  geom_bar() +
+  scale_fill_manual(
+    values = c("-1" = "red", "0" = "gray", "1" = "darkgreen"),
+    labels = c("-1" = "Negative", "0" = "Neutral", "1" = "Positive"),
+    name = "Sentiment"
+  ) +
+  labs(
+    title = "Sentiment Scores - NRC",
+    x = "Sentiment Score",
+    y = "Number of Sentences"
+  ) +
+  theme_minimal()
+
+(g1|g2)
+```
+
+The two barplots present the distribution of sentiment scores in sentences where emojis have been erased, using two different lexicons: CNR on the left and NRC on the right. In both cases, the majority of sentences are classified as either positive or negative, with neutral sentences being much fewer. This suggests that even without emojis, the textual content is rich enough to convey clear sentiment. Comparing the two lexicons, the CNR lexicon results in a slightly higher number of positive sentences compared to negative ones, indicating a more positive skew. The NRC lexicon, on the other hand, shows a more balanced distribution between positive and negative sentences, though positive sentences are still slightly more frequent. In both cases, the number of neutral sentences remains consistently lower. Overall, the choice of lexicon influences how sentiment is captured after removing emojis, with CNR leaning more towards positivity and NRC showing a more even spread between positive and negative classifications.
+
+```{r}
+#| fig-cap: "Sentences Sentiment with Emoji"
+c1 <- ggplot(sentences_rep_cnr, aes(x = sign(sentiment_score), fill = factor(sign(sentiment_score)))) +
+  geom_bar() +
+  scale_fill_manual(
+    values = c("-1" = "red", "0" = "gray", "1" = "darkgreen"),
+    labels = c("-1" = "Negative", "0" = "Neutral", "1" = "Positive"),
+    name = "Sentiment"
+  ) +
+  labs(
+    title = "Sentiment Scores - CNR",
+    x = "Sentiment Score",
+    y = "Number of Sentences"
+  ) +
+  theme_minimal()
+
+# Second plot
+c2 <- ggplot(sentences_rep_nrc, aes(x = sign(sentiment_score), fill = factor(sign(sentiment_score)))) +
+  geom_bar() +
+  scale_fill_manual(
+    values = c("-1" = "red", "0" = "gray", "1" = "darkgreen"),
+    labels = c("-1" = "Negative", "0" = "Neutral", "1" = "Positive"),
+    name = "Sentiment"
+  ) +
+  labs(
+    title = "Sentiment Scores - NRC",
+    x = "Sentiment Score",
+    y = "Number of Sentences"
+  ) +
+  theme_minimal()
+
+(c1|c2)
+```
+
+In this case, where the emojis have been replaced with their descriptions, the overall distribution of sentiment scores remains polarized, with a majority of sentences classified as either positive or negative and fewer neutral sentences. This suggests that the emoji descriptions continue to contribute meaningfully to the sentiment classification. For the CNR lexicon, there is a slight predominance of positive sentences compared to negative ones, mirroring the previous trend seen when emojis were erased. The NRC lexicon shows a very balanced distribution between positive and negative sentences, with both categories occurring almost equally. The replacement of emojis with their textual descriptions helps maintain the sentiment-bearing function of the original emojis, reinforcing polarity and reducing the number of neutral classifications. The choice of lexicon continues to influence the results, with CNR showing a marginal positive skew and NRC maintaining a more balanced classification between positive and negative sentiments.
+
+Since these results indicate that emojis play a significant role in polarizing sentence sentiment, the subsequent analyses on the other subgroups are conducted exclusively using the text in which emojis have been replaced with their descriptions.
+
+Starting with the analysis of the sentiment of the sentences between female and male users:
+
+```{r}
+#| fig-cap: "Sentences Sentiment between Genders with NRC"
+ff1 <- ggplot(sentences_female_nrc, aes(x = sign(sentiment_score), fill = factor(sign(sentiment_score)))) +
+  geom_bar() +
+  scale_fill_manual(
+    values = c("-1" = "red", "0" = "gray", "1" = "darkgreen"),
+    labels = c("-1" = "Negative", "0" = "Neutral", "1" = "Positive"),
+    name = "Sentiment"
+  ) +
+  labs(
+    title = "Sentiment Scores Female Users",
+    x = "Sentiment Score",
+    y = "Number of Sentences"
+  ) +
+  theme_minimal()
+
+# Second plot
+ff2 <- ggplot(sentences_male_nrc, aes(x = sign(sentiment_score), fill = factor(sign(sentiment_score)))) +
+  geom_bar() +
+  scale_fill_manual(
+    values = c("-1" = "red", "0" = "gray", "1" = "darkgreen"),
+    labels = c("-1" = "Negative", "0" = "Neutral", "1" = "Positive"),
+    name = "Sentiment"
+  ) +
+  labs(
+    title = "Sentiment Scores Male Users",
+    x = "Sentiment Score",
+    y = "Number of Sentences"
+  ) +
+  theme_minimal()
+
+(ff1|ff2)
+```
+
+For female users (left plot), there is a slightly higher number of negative sentences compared to positive ones, though both categories are relatively balanced. Neutral sentences are notably fewer, indicating that most sentences from female users express clear sentiment polarity. For male users (right plot), the trend is similar, with negative and positive sentences occurring in almost equal proportions. However, in this case, positive sentences slightly outnumber negative ones. Neutral sentences again appear in smaller quantities. Overall, both groups show a low occurrence of neutral sentences, suggesting that both male and female users tend to write sentences with a distinct sentiment. However, female users exhibit a slight tendency toward negativity, while male users show a slight inclination toward positivity according to the NRC lexicon.
+
+```{r}
+#| fig-cap: "Sentences Sentiment between Genders with the Italian Sentiment Lexicon"
+n1 <- ggplot(sentences_female_cnr, aes(x = sign(sentiment_score), fill = factor(sign(sentiment_score)))) +
+  geom_bar() +
+  scale_fill_manual(
+    values = c("-1" = "red", "0" = "gray", "1" = "darkgreen"),
+    labels = c("-1" = "Negative", "0" = "Neutral", "1" = "Positive"),
+    name = "Sentiment"
+  ) +
+  labs(
+    title = "Sentiment Scores Female Users",
+    x = "Sentiment Score",
+    y = "Number of Sentences"
+  ) +
+  theme_minimal()
+
+# Second plot
+n2 <- ggplot(sentences_male_cnr, aes(x = sign(sentiment_score), fill = factor(sign(sentiment_score)))) +
+  geom_bar() +
+  scale_fill_manual(
+    values = c("-1" = "red", "0" = "gray", "1" = "darkgreen"),
+    labels = c("-1" = "Negative", "0" = "Neutral", "1" = "Positive"),
+    name = "Sentiment"
+  ) +
+  labs(
+    title = "Sentiment Scores Male Users",
+    x = "Sentiment Score",
+    y = "Number of Sentences"
+  ) +
+  theme_minimal()
+
+(n1|n2)
+```
+
+For female users (left plot), positive sentences slightly outnumber negative ones, suggesting a moderate tendency toward positive sentiment. Neutral sentences are less frequent, indicating that female users tend to express clear emotional polarity. For male users (right plot), the pattern is similar, with positive sentences being noticeably more frequent than negative ones. The gap between positive and negative sentences is larger compared to female users, showing a stronger inclination toward positivity in male users. Neutral sentences are again less common. Overall, when using the CNR lexicon, both female and male users predominantly produce sentences with clear sentiment, with male users showing a slightly stronger positive skew compared to female users.
+
+Comparing this plot to the previous one where the NRC lexicon was used, it is evident that the two dictionaries behave more differently when it comes to sentiment scores than they do when analyzing word-level sentiment. While both lexicons show a general polarity in sentence-level sentiment, the differences between them are more pronounced at the sentence level. Specifically, the NRC lexicon tends to yield a more balanced distribution between positive and negative sentences, while the CNR lexicon shows a clearer tendency toward positivity, especially among male users. This suggests that the choice of lexicon has a greater impact on sentence-level sentiment analysis than on the classification of individual words.
+
+Continuing with the analysis comparing most active and less active users:
+
+```{r}
+#| fig-cap: "Sentences Sentiment between Genders with NRC"
+hh1 <- ggplot(sentences_active_nrc, aes(x = sign(sentiment_score), fill = factor(sign(sentiment_score)))) +
+  geom_bar() +
+  scale_fill_manual(
+    values = c("-1" = "red", "0" = "gray", "1" = "darkgreen"),
+    labels = c("-1" = "Negative", "0" = "Neutral", "1" = "Positive"),
+    name = "Sentiment"
+  ) +
+  labs(
+    title = "Sentiment Scores Most Acive Users",
+    x = "Sentiment Score",
+    y = "Number of Sentences"
+  ) +
+  theme_minimal()
+
+# Second plot
+hh2 <- ggplot(sentences_normal_nrc, aes(x = sign(sentiment_score), fill = factor(sign(sentiment_score)))) +
+  geom_bar() +
+  scale_fill_manual(
+    values = c("-1" = "red", "0" = "gray", "1" = "darkgreen"),
+    labels = c("-1" = "Negative", "0" = "Neutral", "1" = "Positive"),
+    name = "Sentiment"
+  ) +
+  labs(
+    title = "Sentiment Scores Less Active Users",
+    x = "Sentiment Score",
+    y = "Number of Sentences"
+  ) +
+  theme_minimal()
+
+(hh1|hh2)
+```
+
+For the most active users (left plot), negative and positive sentences occur in nearly equal proportions, with a slight predominance of negative sentences. Neutral sentences are considerably fewer, suggesting that active users tend to express polarized sentiments. For the less active users (right plot), the pattern is similar but with an even more balanced distribution between negative and positive sentences. Positive sentences slightly outnumber the negative ones. Neutral sentences remain the least common category but are slightly more frequent compared to the most active users.
+
+```{r}
+#| fig-cap: "Sentences Sentiment between Genders with the Italian Sentiment Lexicon"
+nn1 <- ggplot(sentences_active_cnr, aes(x = sign(sentiment_score), fill = factor(sign(sentiment_score)))) +
+  geom_bar() +
+  scale_fill_manual(
+    values = c("-1" = "red", "0" = "gray", "1" = "darkgreen"),
+    labels = c("-1" = "Negative", "0" = "Neutral", "1" = "Positive"),
+    name = "Sentiment"
+  ) +
+  labs(
+    title = "Sentiment Scores Most Active Users",
+    x = "Sentiment Score",
+    y = "Number of Sentences"
+  ) +
+  theme_minimal()
+
+# Second plot
+nn2 <- ggplot(sentences_normal_cnr, aes(x = sign(sentiment_score), fill = factor(sign(sentiment_score)))) +
+  geom_bar() +
+  scale_fill_manual(
+    values = c("-1" = "red", "0" = "gray", "1" = "darkgreen"),
+    labels = c("-1" = "Negative", "0" = "Neutral", "1" = "Positive"),
+    name = "Sentiment"
+  ) +
+  labs(
+    title = "Sentiment Scores Less Active Users",
+    x = "Sentiment Score",
+    y = "Number of Sentences"
+  ) +
+  theme_minimal()
+
+(nn1|nn2)
+```
+
+For the most active users, positive sentences slightly outnumber negative ones, indicating a mild tendency toward positivity. Neutral sentences are less frequent, suggesting that highly active users tend to write sentences with clear emotional polarity. For the less active users, the trend is even more pronounced. Positive sentences are noticeably more frequent than negative ones, and neutral sentences remain the least common. Compared to the most active users, less active users display a stronger positive skew.
+
+Once again, the two dictionaries do not show a strong correspondence in sentence-level sentiment scores. While both the CNR and NRC lexicons highlight polarized sentiment, the way they classify sentences differs notably. This reinforces the idea that the choice of dictionary has a stronger impact on sentence-level sentiment results than on word-level sentiment, leading to diverging interpretations depending on which lexicon is applied.
+
+### BI-GRAMS
+
+The analysis of bigrams, or pairs of adjacent words, provides valuable insight into the relational structure and thematic patterns within the dataset. By focusing on word pairs instead of isolated tokens, it is possible to better capture contextual meaning and detect recurring expressions that convey sentiment, judgment, or actions. In this work, bigrams are extracted after applying stemming to reduce lexical variability, followed by the reconstruction of original terms for interpretation. This approach allows for the identification of key expressions that shape the discourse, highlighting how users articulate emotions, moral stances, and calls to action in the context of femicide-related discussions.
+
+The first bigram analysis is performed on the full dataset, using the corpus where emoji descriptions have been removed.
+
+```{r}
+analyze_bigrams <- function(df_corpus, min_count = 100, seed = 1) {
+  
+  # Step 1: Create a mapping between stemmed words and original words
+  # First, tokenize all words and create a frequency table
+  word_tokens <- df_corpus %>%
+    unnest_tokens(word, text) %>%
+    count(word, sort = TRUE)
+  
+  # Create stem-to-original mapping (keeping the most frequent original form)
+  stem_to_word <- word_tokens %>%
+    mutate(stem = wordStem(word, language = "italian")) %>%
+    group_by(stem) %>%
+    slice_max(n, n = 1, with_ties = FALSE) %>%
+    select(stem, word) %>%
+    ungroup()
+  
+  # Step 2: Stemming (pre-processing)
+  df_stemmed <- df_corpus %>%
+    mutate(stemmed_text = sapply(df_corpus$text, function(x) {
+      # Tokenize the text
+      words <- unlist(strsplit(tolower(x), "\\s+"))
+      # Apply stemming
+      stemmed_words <- wordStem(words, language = "italian")
+      # Join back into text
+      paste(stemmed_words, collapse = " ")
+    }))
+  
+  # Step 3: Extract bigrams
+  bigrams <- df_stemmed %>% 
+    unnest_tokens(bigram, stemmed_text, token = 'ngrams', n = 2) %>% 
+    separate(bigram, c('c1', 'c2'), sep = " ")
+  
+  # Step 4: Calculate bigram counts
+  bigram_counts <- bigrams %>% 
+    count(c1, c2, sort = TRUE) %>%
+    drop_na(c1) %>%
+    drop_na(c2)
+  
+  
+  # Step 5: Create bigram graph with original words
+  bigram_graph_data <- bigram_counts  %>%
+    # Join with stem-to-word mapping to get original words
+    left_join(stem_to_word, by = c("c1" = "stem")) %>%
+    rename(word1 = word) %>%
+    left_join(stem_to_word, by = c("c2" = "stem")) %>%
+    rename(word2 = word) %>%
+    # Use original words where available, fallback to stems if no mapping exists
+    mutate(
+      word1 = ifelse(is.na(word1), c1, word1),
+      word2 = ifelse(is.na(word2), c2, word2)
+    ) %>%
+    select(word1, word2, n)
+  
+  # Create graph from processed data
+  bigram_graph <- graph_from_data_frame(bigram_graph_data %>% 
+                                          filter(n > min_count))
+  
+  # Step 6: Create simplified bigram visualization
+  set.seed(seed)
+  # Make arrows longer
+  a <- grid::arrow(type = 'closed', length = unit(.15, 'inches'))
+  
+  plot <- ggraph(bigram_graph, layout = "fr") +
+    geom_edge_link(aes(edge_alpha = n),
+                   show.legend = TRUE,
+                   arrow = a,
+                   end_cap = circle(.07, 'inches')) +
+    geom_node_point(color = "red", size = 3) +
+    geom_node_text(aes(label = name), vjust = 0.5, hjust = 0.5) +
+    labs(,
+      edge_alpha = "Co-occurrence frequency"
+    ) +
+    theme_void() +
+    # Simplified legend - only for frequency
+    guides(edge_alpha = guide_legend(title = "Co-occurrence frequency")) +
+    theme(
+      legend.position = "right",
+      legend.title = element_text(size = 8),
+      legend.text = element_text(size = 7)
+    )
+  
+  # Return results
+  results <- list(
+    bigram_graph_data = bigram_graph_data,
+    bigram_counts = bigram_counts,
+    bigram_graph = bigram_graph,
+    plot = plot,
+    stemmed_data = df_stemmed,
+    stem_to_word_mapping = stem_to_word
+  )
+  
+  print(plot)
+  return(invisible(results))
+}
+
+
+```
+
+```{r}
+#| fig-cap: "Bigram Network on the Full Dataset"
+analyze_bigrams(corpus_result_erased$df_corpus)
+```
+
+The graph highlights key themes and patterns within this discourse. Some clusters focus on expressions of empathy and condolence, such as "condoglianze famiglia" (condolences family) and "abbraccio forte" (strong hug), suggesting that users often express solidarity and emotional support. Another cluster revolves around judgment and guilt, with bigrams like "colpa mea" (my fault), "coscienza esame" (conscience exam), and "pena morte" (death penalty), indicating a focus on moral responsibility and justice. There is also a noticeable emphasis on the victim and family, with combinations like "povera mamma" (poor mother), "ragazza povera" (poor girl), and "genitori famiglia" (parents family), reflecting emotional responses centered around the victims and their close ones. Lastly, verbs such as "deve essere" (must be), "può fare" (can do), and "buttate via" (throw away) indicate calls to action or reflection, pointing to public discourse about what should or could be done.
+
+This second plot compares the bigram networks of male and female users to identify potential differences in patterns, themes, and language use between the two groups.
+
+```{r, include=FALSE}
+
+aa1 <- analyze_bigrams(corpus_result_erased_female$df_corpus, min = 50)
+aa2 <- analyze_bigrams(corpus_result_erased_male$df_corpus, min = 50)
+```
+
+```{r}
+#| fig-cap: "Bigram Network for Female and Male Users"
+(aa1$plot|aa2$plot)
+```
+
+In both networks, emotional and socially charged terms dominate the discourse. Female users (left plot) often produce bigrams related to empathy and mourning, such as "povera ragazza" (poor girl), "abbraccio forte" (strong hug), and "condoglianze famiglia" (condolences family), indicating a focus on emotional support and compassion. There is also a presence of justice-related terms like "pena morte" (death penalty) and "omicidio duplice" (double homicide), reflecting concerns about punishment and accountability. Male users (right plot) show a similar tendency toward expressions of sympathy and sorrow with bigrams like "povera mamma" (poor mother), "riposa pace" (rest in peace), and "famiglia condoglianze" (family condolences). However, compared to female users, male comments display fewer references to punitive terms and more toward traditional condolences and reactions such as "bravo ragazza" (good girl) or "giulia famiglia" (Giulia family), which are more personalized. Additionally, male users' bigram network appears more fragmented, suggesting slightly less lexical variety in co-occurrence patterns compared to female users. Female users tend to have a denser and more connected network of expressions involving emotions, actions, and moral judgments.
+
+Lastly, this plot compares the bigram networks of the most active users with those of the less active users.
+
+```{r, include=FALSE}
+bb1 <- analyze_bigrams(corpus_result_erased_active$df_corpus, min = 50)
+bb2 <- analyze_bigrams(corpus_result_erased_normal$df_corpus, min = 100)
+```
+
+```{r}
+#| fig-cap: "Bigram Network on Most Active and Less Active Users"
+(bb1$plot|bb2$plot)
+```
+
+For the most active users (left plot), the network highlights terms related to both condolence and justice. There are expressions of sympathy such as "condoglianze famiglia" (condolences family) and "riposa pace" (rest in peace), but also stronger justice-oriented bigrams like "pena morte" (death penalty), "sedia elettrica" (electric chair), and "toglier vita" (take life). The presence of these terms suggests that active users engage in discussions not only to show grief but also to express anger and seek justice or punishment. Less active users (right plot) also show strong emotional involvement, with frequent bigrams such as "riposa pace" (rest in peace), "famiglia condoglianze" (family condolences), and "povera ragazza" (poor girl). However, compared to active users, their network appears to lean more toward mourning and sympathy rather than calls for punitive justice. The justice-oriented terms are present but less prominent, with fewer edges linked to expressions like "pena morte". Additionally, the network of less active users appears slightly denser, with key terms like "giulia", "mamma", "povera", and "famiglia" playing a central role, reflecting a stronger emotional focus on the victims and their families. In summary, both groups display emotional reactions, but most active users are more likely to mix sympathy with discussions of punishment and justice, whereas less active users show a tendency to focus more on sorrow, condolences, and empathy for the victims. This suggests a difference in engagement style between the two groups: active users balance grief with societal critique, while less active users center more on emotional and familial aspects.
+
+### The Impact of Negation on Sentiment Polarity
+
+Negation plays a crucial role in shaping the emotional tone of language, particularly in sentiment analysis. In this section, the focus is on exploring how different forms of negation influence the polarity of words in user comments. By identifying common negation words and examining the terms that follow them, it becomes possible to assess how sentiment shifts under the presence of negation. Two lexicons, NRC and CNR, are applied separately to evaluate whether sentiment patterns remain consistent or diverge depending on the sentiment dictionary used. The following plots highlight how negated contexts contribute to either amplifying or modifying the emotional weight of words within the dataset.
+
+```{r}
+corpus_result_neg <- process_text_data(data, "Erase_Emoji", remove_words = setdiff(c(tm::stopwords('it'), "così"), "non"))
+negation_words <- c('non', 'niente','nulla','nessuno', 'mai', 'neanche', 'neppure', 'nemmeno', 'senza')
+score_unigrams <- get_sentiment(unique(corpus_result_neg$word_tokens$word), method = "nrc", language= "italian")
+score_unigrams <- cbind(unique(corpus_result_neg$word_tokens$word), score_unigrams)
+score_unigrams <- score_unigrams %>% as.data.frame() %>% mutate(sentiment = sign(as.numeric(score_unigrams)))
+
+
+bigrams_neg <- corpus_result_neg$df_corpus %>% 
+  unnest_tokens(bigram, text, token = 'ngrams', n = 2)  %>% 
+  separate(bigram, c('c1', 'c2'), sep = " " )
+
+negated_words <- bigrams_neg %>% 
+  filter(c1 %in% negation_words) %>% 
+  inner_join(score_unigrams, by = c('c2' = 'V1')) %>% 
+  count(c1, c2, sentiment, sort = TRUE) %>% 
+  ungroup()
+
+top_neg_word <- negated_words %>% 
+  mutate(contribution = n * sentiment) %>% 
+  arrange(desc(abs(contribution))) %>% 
+  group_by(c1) %>% 
+  slice_max(n = 4, abs(contribution)) %>% 
+  ungroup() %>% 
+  mutate(c2 = reorder(c2, contribution)) 
+```
+
+```{r, fig.width= 10, fig.height= 7 }
+#| fig-cap: "Positive and Negative emotions with NRC"
+ggplot(top_neg_word, aes(c2, n * sentiment, fill = n * sentiment > 0)) +
+  geom_col(show.legend = FALSE) +
+  xlab("Words preceded by negation") +
+  ylab("Sentiment score * number of occurrences") +
+  facet_wrap(~c1, ncol = 2, scales = 'free') +
+  coord_flip()
+```
+
+The bars represent the product of sentiment score and frequency for each negated word, offering insight into both the intensity and direction of sentiment under negation. The analysis reveals that negations often shift the sentiment context. For instance, words like "parole" and "colpa" following non exhibit strong negative polarity, while words such as "giusto" and "bene" maintain a positive orientation even when negated. The word "male" consistently carries a negative sentiment across various negators like nessuno, niente, and nulla, reinforcing its strong negative connotation. Interestingly, some positive or neutral words like "famiglia" and "coraggio" appear after negators such as mai and nemmeno, suggesting more complex or potentially ironic sentiment patterns. Additionally, "senza" (without) enhances negative framing, particularly in combinations like "senza parole" (speechless) and "senza dubbio" (without doubt). This plot underscores how negation, combined with the NRC lexicon, influences the emotional tone of comments by amplifying negativity or creating nuanced sentiment shifts, especially in sensitive discussions like those surrounding femicides.
+
+```{r}
+# cnr 
+cnr_lex<- cnr_lex %>%
+  mutate(sentiment_num = case_when(
+    sentiment == "positive" ~ 1,
+    sentiment == "neutral" ~ 0,
+    sentiment == "negative" ~ -1,
+    TRUE ~ NA_real_ # opzionale per eventuali valori mancanti
+  ))
+
+negated_words_cnr <- bigrams_neg %>% 
+  filter(c1 %in% negation_words) %>% 
+  inner_join(cnr_lex, by = c('c2' = 'word')) %>% 
+  count(c1, c2, sentiment_num, sort = TRUE) %>% 
+  ungroup()
+
+top_neg_word_cnr <- negated_words_cnr %>% 
+  mutate(contribution = n * sentiment_num) %>% 
+  arrange(desc(abs(contribution))) %>% 
+  group_by(c1) %>% 
+  slice_max(n = 4, abs(contribution)) %>% 
+  ungroup() %>% 
+  mutate(c2 = reorder(c2, contribution)) 
+```
+
+```{r, fig.width= 10, fig.height= 7}
+#| fig-cap: "Positive and Negative emotions with CNR"
+ggplot(top_neg_word_cnr, aes(c2, n * sentiment_num, fill = n * sentiment_num > 0)) +
+  geom_col(show.legend = FALSE) +
+  xlab("Words preceded by negation") +
+  ylab("Sentiment score * number of occurrences") +
+  facet_wrap(~c1, ncol = 2, scales = 'free') +
+  coord_flip()
+```
+
+Compared to the NRC version, the CNR lexicon yields stronger negative polarities, particularly after negations such as niente, nulla, and non. For example, words like "solo", "male", and "colpa" consistently carry a heavier negative sentiment load, especially under non, niente, and nulla. The strong negativity reflects how the CNR lexicon emphasizes harsh or judgmental tones in these contexts. On the positive side, "bene", "giusto", and "buono" retain their positivity after negation but with less intensity than in the NRC-based plot, suggesting that the CNR lexicon tends to mitigate positive polarities when combined with negators. Additionally, words following senza (without), such as "cuore" (heart) and "fine" (end), display both negative and positive sentiment, reinforcing that negation can generate mixed emotional tones, especially in sensitive discussions like those related to femicides. Overall, with the CNR lexicon, the impact of negation leans more heavily towards reinforcing negative sentiment, as compared to the more balanced effect observed with the NRC lexicon. This highlights how different lexicons can shape the perceived sentiment dynamics when negation is present.
+
+## Discussion and Limitations
+
+While the gender assignment process enables to conduct the analysis despite the lack of self-reported gender data, several limitations should be acknowledged. First, usernames are inherently unreliable indicators of identity. They may reflect nicknames, fictional characters, brand names, or other non-human entities (e.g., "MusicLover1990" or "Tech_Company"). This could lead to erroneous gender assignments, as the method assumes that certain name patterns embedded in usernames relate to actual individuals. Second, even when usernames include a valid first name, this may not correspond to the gender identity of the commenter. The method does not account for cases where individuals use names that do not align with their gender identity, nor does it consider non-binary or gender-diverse identities. For simplicity, the system applies a binary gender model (male/female) and resorts to an "unknown" category when no reliable assignment is possible. Third, both the name-matching step and the LLM rely on probabilistic and external datasets, which may embed their own biases (e.g., over-representation of certain names, traditional gender associations in datasets, or model biases from the LLM). These biases can impact the gender classification and affect the analysis. Finally, this method assumes that one username corresponds to one individual, ignoring cases where accounts may be shared (e.g., organizational accounts) or where one person operates multiple accounts. Despite these limitations, introducing the "unknown" category reduces the risk of misclassification by acknowledging uncertainty. Nonetheless, the presence of the "unknown" category must be considered when interpreting the results, as it could influence aggregate gender-related trends in the data. These ethical and methodological concerns are important to bear in mind when evaluating the validity and generalizability of the findings, and further studies could benefit from alternative approaches.
+
+A part from the limitations regarding the gender assignment procedures, some more arised in the analysis:
+
+One of the key limitations identified in this work relates to the dictionaries used for sentiment analysis. While lexicons like NRC and CNR are widely employed in sentiment research, they proved to be unsatisfactory in fully capturing the nuances of the language within this dataset. Certain sentiment attributions appeared difficult to justify, even for native speakers, suggesting that these resources may oversimplify or misrepresent the emotional tone of specific terms in context.
+
+Another important consideration is that the sentiment evaluation was conducted primarily at the word level, without a broader contextual understanding of full sentences or comments. This approach limits the ability to capture the complexity and subtlety of the discourse, where negation, irony, and multi-word expressions could alter the intended sentiment. A sentiment analysis framework that considers entire comments, rather than isolated tokens, would likely provide a more accurate depiction of the users' emotional expressions.
+
+Additionally, this analysis could benefit from the integration of lemmatization. Unlike stemming, which mechanically reduces words to their root forms, lemmatization relies on a dictionary to return the correct base or dictionary form of a word. This makes lemmatization more suitable for preserving meaning and reducing lexical variability, as it groups together words that share the same lemma but differ in inflection. Incorporating lemmatization would likely improve the consistency of sentiment scoring and enhance the interpretability of the bigram networks.
+
+Lastly, the study did not account for the presence of multiple identical emojis within a single comment. By treating emojis as binary elements (present or erased) without quantifying their frequency, the analysis may have introduced a bias. Repeated emojis could potentially amplify the intended sentiment of a comment, and neglecting this dimension may have led to an underestimation or distortion of their emotional impact.
+
+## Conclusion
+
+This research has provided valuable insights into how male and female users, as well as users with varying levels of activity, engage with discussions surrounding femicides on YouTube. By analyzing comments on the femicides of Giulia Cecchettin and Giulia Tramontano, this study demonstrates that gender plays a significant role in shaping the emotional and discursive tone of online reactions.
+
+The results confirm that both male and female users tend to express predominantly negative sentiments, as expected given the tragic subject matter. However, notable differences emerged. Female users exhibited a stronger focus on empathy, fear, and relational themes, as shown by the frequent use of terms such as "mamma," "famiglia," and "coraggio." Male users, while also expressing grief and anger, were more likely to emphasize punitive or justice-related expressions, including "carcere," "pena," and "assassino." Similar patterns were observed when comparing the most active users to less active users, where highly active users displayed a greater focus on justice and condemnation, while less active users were more inclined to express sorrow and empathy.
+
+Furthermore, the analysis of negation revealed that negation structures amplify negative sentiment, with both lexicons (NRC and CNR) showing that words preceded by negators such as non or senza tend to lean more heavily toward negative polarity. However, discrepancies between the lexicons highlight how methodological choices affect sentiment interpretation. The NRC lexicon showed a more balanced polarity distribution, while the CNR lexicon amplified negative scores, particularly in combination with negation.
+
+The project also revealed limitations in current sentiment lexicons, as certain sentiment scores appeared misaligned with the contextual meaning recognized by native speakers. This suggests that existing lexicons may not fully capture the complexity of language in sensitive topics such as femicide. Moreover, analyzing sentiment primarily at the word level proved limiting, as it failed to account for broader contextual or syntactic structures within full sentences or comments. A future extension should consider sentiment models capable of sentence-level analysis.
+
+Another avenue for improvement is the use of lemmatization, which—unlike stemming—relies on dictionary-based processing to resolve inflections while preserving semantic meaning. Integrating lemmatization would likely enhance sentiment scoring and improve the interpretability of bigram networks.
+
+Finally, a potential bias was introduced by the handling of emojis. This study replaced or erased emojis without accounting for their frequency within comments. Repeated emojis may intensify the emotional charge of a comment, and this aspect should be considered in future sentiment models.
+
+In conclusion, this research contributes to the understanding of gendered patterns in online discourse around femicide and illustrates how methodological choices (e.g., lexicon selection, text pre-processing) can impact findings. The study encourages further exploration of gender and emotional expression in digital spaces and suggests that integrating more context-aware tools could improve the reliability and depth of future sentiment analyses on social issues.
+
+## References
+
+-   Agenzia Spada. (n.d.). *Spot pubblicitari su La7: informazioni e costi*. Retrieved from https://agenziaspada.com
+-   Agenzia Spada. (n.d.). *Spot pubblicitari su Nove: informazioni e costi*. Retrieved from https://agenziaspada.com
+-   Ansa.it. (2023). *Giulia uccisa con 37 coltellate, 2 fatali al collo*. Retrieved from https://ansa.it
+-   AP News. (2024). *Italy holds a trial into the killing of a woman that sparked debate over femicide*. Retrieved from https://apnews.com
+-   Arxiv.org. (2024). *Gender differences in online communication: A case study of Soccer*. Retrieved from https://arxiv.org/abs/2403.11051
+-   CEUR-WS.org. (2023). *Beyond Headlines: A Corpus of Femicides News Coverage in Italian Newspapers*. Retrieved from http://ceur-ws.org
+-   Küchler, C., Stoll, A., Ziegele, M., & Naab, T.K. (2023). *Gender-Related Differences in Online Comment Sections*. Sage Journals. https://doi.org/10.1177/19401612221137905
+-   Wikipedia. (n.d.). *La7 - Wikipedia*. Retrieved from https://it.wikipedia.org/wiki/La7
+-   Thelwall, M., & Foster, D. (2021). *Male or female gender‐polarized YouTube videos are less viewed*. *Journal of the Association for Information Science and Technology*.
+-   Wikipedia. (n.d.). *Nove (rete televisiva) - Wikipedia*. Retrieved from https://it.wikipedia.org/wiki/Nove\_(rete_televisiva)
+-   People.com. (2023). *Man Who Hid Murdered Girlfriend's Body in Garbage Bags at Ravine Sentenced to Life in Case That Shocked Italy*. Retrieved from https://people.com
+-   ResearchGate. (2022). *Femicide in Italy: “Femminicidio”, moral panic and progressivist discourse*. Retrieved from https://researchgate.net
+-   Sage Journals. (2023). *Investigating gender and racial-ethnic biases in sentiment analysis of language*. Retrieved from https://tandfonline.com
+-   UN Women. (2023). *Cinque fatti essenziali da sapere sul femminicidio*. Retrieved from https://unwomen.org
+-   YouTube. (n.d.). *NOVE - Canale ufficiale su YouTube*. Retrieved from https://youtube.com
+
+## Appendix
+
+```{r, echo = TRUE}
+print(conf_matrix)
+#This is the output of the confusion matrix. 
+
+# Convert to data frame for ggplot2
+conf_df <- as.data.frame(table(true_gender$final_gender, true_gender$true_gender))
+colnames(conf_df) <- c("Predicted", "True", "Count")
+
+# Plot confusion matrix as heatmap
+ggplot(conf_df, aes(x = True, y = Predicted, fill = Count)) +
+  geom_tile() +
+  geom_text(aes(label = Count), color = "white", size = 5) +
+  scale_fill_gradient(low = "white", high = "blue") +
+  labs(title = "Confusion Matrix", x = "True Gender", y = "Predicted Gender") +
+  theme_minimal()
+
+ggplot(true_gender, aes(x = true_gender, fill = final_gender)) +
+  geom_bar(position = "fill") +  # Proportion of each category
+  labs(title = "True vs. Predicted Gender", x = "True Gender", y = "Proportion") +
+  theme_minimal()
+
+```
+
+The plot displays the proportional relationship between true and predicted gender labels in the test dataset. For both the "male" and "female" true gender categories, the model performs strongly, with most predictions aligning correctly with the true labels (e.g., nearly 100% of true "male" cases are predicted as "male", and most "female" cases are predicted as "female").
+
+However, for the "unknown" true gender category, the model shows more variability. While the majority of "unknown" cases are correctly predicted as "unknown," a portion is misclassified as either "male" or "female." This confirms earlier concerns that the model tends to prefer assigning a binary gender when uncertain, rather than consistently labeling these cases as "unknown."
+
+Overall, this plot highlights the model’s good performance on clear-cut cases ("male" and "female") but also its tendency to underperform on #ambiguous or hard-to-classify usernames, represented by the "unknown" group.
+
+```{r, eval=FALSE, echo=TRUE}
+# It is highly recommended to avoid running this section, as it is 
+#extremely computationally expensive.
+
+#Apply the procedure to the final dataset. 
+f_1 <- final_dataset[1:5000,]
+df_2 <- final_dataset[5001:10000, ]
+df_3 <- final_dataset[10001:15000, ]
+df_4 <- final_dataset[15001:20000, ]
+df_5 <- final_dataset[20001:25000, ]
+df_6 <- final_dataset[25001:30000, ]
+df_7 <- final_dataset[30001:35000, ]
+df_8 <- final_dataset[35001:40000, ]
+df_9 <- final_dataset[40001:nrow(final_dataset), ]
+
+df_1_gender <- apply_advanced_gender_detection(df_1, "authorDisplayName")
+df_1_final <- process_unknown_names(df_1_gender, batch_size = 50)
+write.xlsx(df_1_final, file = "C:/Users/schia/Documents/LMU/CSS/df_1_final.xlsx")
+
+df_2_gender <- apply_advanced_gender_detection(df_2, "authorDisplayName")
+df_2_final <- process_unknown_names(df_2_gender, batch_size = 50)
+write.xlsx(df_2_final, file = "C:/Users/schia/Documents/LMU/CSS/df_2_final.xlsx")
+
+df_3_gender <- apply_advanced_gender_detection(df_3, "authorDisplayName")
+df_3_final <- process_unknown_names(df_3_gender, batch_size = 50)
+write.xlsx(df_3_final, file = "C:/Users/schia/Documents/LMU/CSS/df_3_final.xlsx")
+
+df_4_gender <- apply_advanced_gender_detection(df_4, "authorDisplayName")
+df_4_final <- process_unknown_names(df_4_gender, batch_size = 50)
+write.xlsx(df_4_final, file = "C:/Users/schia/Documents/LMU/CSS/df_4_final.xlsx")
+
+df_5_gender <- apply_advanced_gender_detection(df_5, "authorDisplayName")
+df_5_final <- process_unknown_names(df_5_gender, batch_size = 50)
+write.xlsx(df_5_final, file = "C:/Users/schia/Documents/LMU/CSS/df_5_final.xlsx")
+
+df_6_gender <- apply_advanced_gender_detection(df_6, "authorDisplayName")
+df_6_final <- process_unknown_names(df_6_gender, batch_size = 50)
+write.xlsx(df_6_final, file = "C:/Users/schia/Documents/LMU/CSS/df_6_final.xlsx")
+
+df_7_gender <- apply_advanced_gender_detection(df_7, "authorDisplayName")
+df_7_final <- process_unknown_names(df_7_gender, batch_size = 50)
+write.xlsx(df_7_final, file = "C:/Users/schia/Documents/LMU/CSS/df_7_final.xlsx")
+
+df_8_gender <- apply_advanced_gender_detection(df_8, "authorDisplayName")
+df_8_final <- process_unknown_names(df_8_gender, batch_size = 50)
+write.xlsx(df_8_final, file = "C:/Users/schia/Documents/LMU/CSS/df_8_final.xlsx")
+
+df_9_gender <- apply_advanced_gender_detection(df_9, "authorDisplayName")
+df_9_final <- process_unknown_names(df_9_gender, batch_size = 50)
+write.xlsx(df_9_final, file = "C:/Users/schia/Documents/LMU/CSS/df_9_final.xlsx")
+```
+
+```{r, eval=FALSE, echo=TRUE}
+
+#Emoji translation using the chat gpt API 
+# usethis::edit_r_environ(scope = "user")
+chat_key = Sys.getenv("chat_key")
+
+translate_batch <- function(texts) {
+  response <- POST(
+    url = "https://api.openai.com/v1/chat/completions",
+    add_headers(
+      `Authorization` = paste("Bearer", chat_key),
+      `Content-Type` = "application/json"
+    ),
+    body = toJSON(list(
+      model = "gpt-4o-mini",
+      messages = list(
+        list(role = "system", content = "You are an expert in emoji 
+        descriptions and their translations into Italian.
+I will provide you with a character vector containing English descriptions.
+Your task is to return a character vector of the same length, with each 
+description accurately translated into Italian.
+Here are the English descriptions:
+%s
+Please provide ONLY the Italian translations, one per line, with no 
+explanations, numbering, prefixes or additional text.
+Do not include the original English text or any other commentary."),
+        list(role = "user", content = paste(texts, collapse = "\n"))
+      ),
+      temperature = 0.3
+    ), auto_unbox = TRUE)
+  )
+  
+  # Extract response
+  result <- content(response, as = "parsed", encoding = "UTF-8")
+  
+  # Return split translations
+  if (!is.null(result$choices)) {
+    return(strsplit(result$choices[[1]]$message$content, "\n")[[1]])
+  } else {
+    return(rep(NA, length(texts)))  
+  }
+}
+
+# Split into chunks of 50 and process in batches
+batch_size <- 50  
+num_batches <- ceiling(length(emoji.descriptions) / batch_size)
+
+#Run batch processing
+emoji_translations <- unlist(lapply(seq(1, length(emoji.descriptions),
+                                        by = batch_size), function(i) {
+  end <- min(i + batch_size - 1, length(emoji.descriptions))
+  print(paste("Translating batch", i, "to", end))  
+  translate_batch(emoji.descriptions[i:end])
+}))
+
+#Since there were 6 missing translations, those were identified through human detection 
+emoji.descriptions[c(737,738,3101,3153,3174,3175)]
+missing_transl <- c(
+  "donna che aggrotta le sopracciglia: tono di pelle scura",
+  "donna che aggrotta le sopracciglia: tono di pelle scura",
+  "bacio: donna, uomo, tono della pelle medio-chiaro, tono della pelle medio-scuro",
+  "bacio: uomo, uomo, tono della pelle medio-chiaro, tono della pelle medio-scuro",
+  "bacio: uomo, uomo, tono della pelle medio-scuro, tono della pelle scuro",
+  "bacio: uomo, uomo, tono della pelle medio-scuro, tono della pelle scuro"
+)
+
+result <- character(length(emoji_translations) + length(missing_transl))
+indices <- rep(NA, length(result))
+missing_transl <- indices[c(737,738,3101,3153,3174,3175)]
+emoji_translations <- indices[-c(737,738,3101,3153,3174,3175)]
+                      [is.na(indices[-c(737,738,3101,3153,3174,3175)])] 
+
+result <- indices[!is.na(indices)]
+write.table(result, file = "emoji_tradotte.txt")
+```
+
+```{r,echo=TRUE, eval=FALSE}
+#Get the NRC dictionary 
+nrc_lex <- get_sentiment_dictionary(dictionary = "nrc", language = "italian")
+
+#Get the Italian Sentiment Lexicon
+system("git clone https://github.com/opener-project/public-sentiment-lexicons.git") 
+#Clone the repository from the githib page 
+
+#The files will be in the propagation_lexicons/it folder
+lmf_file <- "public-sentiment-lexicons/propagation_lexicons/it/
+              it.lemma.sy.an.hypo.rels.maxdepth5.seed500.maj.gold.lmf"
+xml_data <- read_xml(lmf_file)
+
+#Using the .lmf extenction, first load the words
+entry_nodes <- xml_find_all(xml_data, "//LexicalEntry")
+
+#Then load the sentiment
+#Select all 'sense' nodes within 'entry' nodes
+sense_nodes <- xml_find_all(xml_data, ".//Sense//Sentiment")
+
+# Function to extract lexicon from an LMF file
+extract_lexicon <- function(file_path) {
+  xml_data <- read_xml(file_path)
+  
+  # Extract lexical entries
+  entries <- xml_find_all(xml_data, "//LexicalEntry")
+  
+  # Create a data frame of words
+  words <- lapply(entries, function(entry) {
+    # Extract the word form
+    word <- xml_text(xml_find_first(entry, ".//Lemma/@writtenForm"))
+    
+    sentiment_node <- xml_find_first(entry, ".//Sense/Sentiment")
+    sentiment_value <- if(!is.na(sentiment_node)) {
+      xml_attr(sentiment_node, "polarity")
+    } else {
+      # If no explicit value, use the file name to determine sentiment
+      str_extract(file_path, "[a-z]+(?=\\.lmf$)")
+    }
+    
+    return(data.frame(word = word, sentiment = sentiment_value))
+  })
+  
+  # Combine all words
+  result <- do.call(rbind, words)
+  return(result)
+}
+cnr_lex <- extract_lexicon(lmf_file)
+
+```
+
+```{r,echo=TRUE}
+#|fig-cap: "Most frequent words"
+ggplot(highest_freq_words_erased[1:15, ],
+       aes(x = reorder(word, -freq), y = freq)) +
+  geom_bar(stat = "identity", fill = "lightblue") +
+  labs(    y = "Word frequencies",
+    x = ""
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
